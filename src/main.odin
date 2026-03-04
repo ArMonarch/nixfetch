@@ -8,9 +8,11 @@ FetchFields :: struct {
 	kernel_info:  string,
 	shell_info:   string,
 	desktop_info: string,
+	uptime:       string,
 	colors:       string,
 }
 
+// collect all system info and print the fetch output
 main :: proc() {
 	fetch_fields := FetchFields {
 		user_info    = get_username_and_hostname(),
@@ -19,6 +21,7 @@ main :: proc() {
 		kernel_info  = get_kernel_info(),
 		shell_info   = get_shell_info(),
 		desktop_info = get_desktop_info(),
+		uptime       = get_uptime(),
 		colors       = get_colored_dots(),
 	}
 

@@ -1,6 +1,8 @@
 package nixfetch
 
 import "core:strings"
+
+// builds the NixOS logo with format placeholders for system info on the right side
 nixos_logo_fmt :: proc() -> string {
 	// :........................................:
 	// :                                        :
@@ -66,7 +68,7 @@ nixos_logo_fmt :: proc() -> string {
 		&fmt,
 		"  ◢█████████◤            ◥█████████◣    ",
 	)
-	strings.write_string(&fmt, "\n")
+	strings.write_string(&fmt, "%-16s: %s\n")
 	strings.write_string(
 		&fmt,
 		"  ◥█████████◣            ◢█████████◤    ",

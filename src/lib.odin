@@ -6,6 +6,7 @@ import "core:strings"
 import "core:sys/linux"
 import "core:terminal/ansi"
 
+// ANSI foreground color escape sequences
 FG_BLACK :: "\x1b[" + ansi.FG_BLACK + "m"
 FG_RED :: "\x1b[" + ansi.FG_RED + "m"
 FG_GREEN :: "\x1b[" + ansi.FG_GREEN + "m"
@@ -15,6 +16,7 @@ FG_MAGENTA :: "\x1b[" + ansi.FG_MAGENTA + "m"
 FG_CYAN :: "\x1b[" + ansi.FG_CYAN + "m"
 FG_WHITE :: "\x1b[" + ansi.FG_WHITE + "m"
 
+// resets terminal color back to default
 FG_RESET :: "\x1b[" + ansi.RESET + "m"
 
 
@@ -92,6 +94,7 @@ get_host_info :: proc() -> string {
 	return strings.to_string(result)
 }
 
+// returns "sysname release (machine)" via uname syscall
 get_kernel_info :: proc() -> string {
 	uts_name: linux.UTS_Name
 	linux.uname(&uts_name)
@@ -111,6 +114,7 @@ get_kernel_info :: proc() -> string {
 	return strings.to_string(result)
 }
 
+// returns "desktop_name (session_type)" from XDG env vars
 get_desktop_info :: proc() -> string {
 	session: string
 
@@ -136,7 +140,7 @@ get_desktop_info :: proc() -> string {
 }
 
 
-// reads SHELL env var and runs "<shell> --version" to get shell name and version
+// returns shell name (basename of $SHELL)
 get_shell_info :: proc() -> string {
 	shell_path: string
 	if value, success := os.lookup_env("SHELL"); success != true {
@@ -150,6 +154,48 @@ get_shell_info :: proc() -> string {
 	shell_name := last_slash >= 0 ? shell_path[last_slash + 1:] : shell_path
 
 	return shell_name
+}
+
+// returns system uptime via sysinfo syscall, formatted as "Xd, Xh, Xm"
+get_uptime :: proc() -> string {
+	info: linux.Sys_Info
+	if err := linux.sysinfo(&info); err != .NONE {
+		return "infinity"
+	}
+
+	// convert total seconds into days, hours, minutes
+	days := info.uptime / 86400
+	hours := (info.uptime / 3600) % 24
+	mins := (info.uptime / 60) % 60
+
+	result := strings.builder_make(0, 32)
+
+	if days > 0 {
+		strings.write_string(&result, fmt.aprint(days))
+		strings.write_string(&result, days == 1 ? " day" : "days")
+	}
+
+	if hours > 0 {
+		if len(result.buf) != 0 {
+			strings.write_string(&result, ", ")
+		}
+		strings.write_string(&result, fmt.aprint(hours))
+		strings.write_string(&result, hours == 1 ? " hour" : " hours")
+	}
+
+	if mins > 0 {
+		if len(result.buf) != 0 {
+			strings.write_string(&result, ", ")
+		}
+		strings.write_string(&result, fmt.aprint(mins))
+		strings.write_string(&result, mins == 1 ? " minute" : " minutes")
+	}
+
+	if len(result.buf) == 0 {
+		strings.write_string(&result, "less than a minute")
+	}
+
+	return strings.to_string(result)
 }
 
 // returns a row of 6 colored dot glyphs
@@ -189,6 +235,8 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 		fetch_fields.shell_info,
 		FG_BLUE + "Desktop" + FG_RESET,
 		fetch_fields.desktop_info,
+		FG_BLUE + "Uptime" + FG_RESET,
+		fetch_fields.uptime,
 		FG_BLUE + "Colors" + FG_RESET,
 		fetch_fields.colors,
 	)
