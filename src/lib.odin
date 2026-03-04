@@ -18,27 +18,24 @@ FG_WHITE :: "\x1b[" + ansi.FG_WHITE + "m"
 FG_RESET :: "\x1b[" + ansi.RESET + "m"
 
 
-// procedure to get the user_name and host_name
+// returns colored "user@hostname~" string
 get_username_and_hostname :: proc() -> string {
 	username: string
-	//append `USER` environment varaiable value if found else append unknown
 	if value, found := os.lookup_env("USER"); found == true {
 		username = value
 	} else {
 		username = "unknown_user"
 	}
 
-	// get the hostname with libc
+	// get hostname via uname syscall
 	uts_name: linux.UTS_Name
 	linux.uname(&uts_name)
 	hostname := strings.clone_from_cstring(cstring(&uts_name.nodename[0]))
 
-	// final ansi colored username & hostname output
-	// ansi_yello_color(\x1b[33m) + len(username) + @ + ansi_green_color(\x1b[??m) + len(hostname) + ansi_reset(\x1b[0m)
 	cap := 5 + len(username) + 1 + 5 + len(hostname) + 4 + 1
 	result := strings.builder_make(len = 0, cap = cap)
 
-	// append necessary content to makek username & hostname
+	// build colored "user@hostname~" output
 	strings.write_string(&result, FG_YELLOW)
 	strings.write_string(&result, username)
 	strings.write_rune(&result, '@')
@@ -50,7 +47,7 @@ get_username_and_hostname :: proc() -> string {
 	return strings.to_string(result)
 }
 
-// procedure to get the pretty os name
+// reads PRETTY_NAME from /etc/os-release
 get_osname :: proc() -> string {
 	data, success := os.read_entire_file("/etc/os-release")
 	if success != true {
@@ -70,7 +67,7 @@ get_osname :: proc() -> string {
 	return result
 }
 
-// procedure to get the system device info
+// returns "product_name (product_family)" from DMI sysfs
 get_host_info :: proc() -> string {
 	product_name_data, success_product_name := os.read_entire_file(
 		"/sys/devices/virtual/dmi/id/product_name",
@@ -95,6 +92,8 @@ get_host_info :: proc() -> string {
 	return strings.to_string(result)
 }
 
+
+// returns a row of 6 colored dot glyphs
 get_colored_dots :: proc() -> string {
 	GLYPH :: "  "
 	// final capacity
@@ -114,7 +113,7 @@ get_colored_dots :: proc() -> string {
 	return strings.to_string(result)
 }
 
-// procedure to pretty print the FetchFields struct to stdout
+// prints all fetch fields formatted inside the NixOS logo
 print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 	buffer := strings.builder_make(len = 0, cap = 1024)
 
@@ -125,6 +124,10 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 		fetch_fields.os_name,
 		FG_BLUE + "Host" + FG_RESET,
 		fetch_fields.host_info,
+		FG_BLUE + "Kernel" + FG_RESET,
+		fetch_fields.kernel_info,
+		FG_BLUE + "Desktop" + FG_RESET,
+		fetch_fields.desktop_info,
 		FG_BLUE + "Colors" + FG_RESET,
 		fetch_fields.colors,
 	)
