@@ -92,6 +92,65 @@ get_host_info :: proc() -> string {
 	return strings.to_string(result)
 }
 
+get_kernel_info :: proc() -> string {
+	uts_name: linux.UTS_Name
+	linux.uname(&uts_name)
+
+	system := string(cstring(&uts_name.sysname[0]))
+	release := string(cstring(&uts_name.release[0]))
+	machine := string(cstring(&uts_name.machine[0]))
+
+	result := strings.builder_make(0, len(system) + len(release) + len(machine) + 4)
+	strings.write_string(&result, system)
+	strings.write_rune(&result, ' ')
+	strings.write_string(&result, release)
+	strings.write_string(&result, " (")
+	strings.write_string(&result, machine)
+	strings.write_string(&result, ")")
+
+	return strings.to_string(result)
+}
+
+get_desktop_info :: proc() -> string {
+	session: string
+
+	if value, success := os.lookup_env("XDG_CURRENT_DESKTOP"); success != true {
+		session = "unknown"
+	} else {
+		session = value
+	}
+
+	desktop: string
+	if value, success := os.lookup_env("XDG_SESSION_TYPE"); success != true {
+		desktop = "unknown"
+	} else {
+		desktop = value
+	}
+
+	result := strings.builder_make(0, len(session) + len(desktop) + 3)
+	strings.write_string(&result, session)
+	strings.write_string(&result, " (")
+	strings.write_string(&result, desktop)
+	strings.write_string(&result, ")")
+	return strings.to_string(result)
+}
+
+
+// reads SHELL env var and runs "<shell> --version" to get shell name and version
+get_shell_info :: proc() -> string {
+	shell_path: string
+	if value, success := os.lookup_env("SHELL"); success != true {
+		return "unknown"
+	} else {
+		shell_path = value
+	}
+
+	// extract shell name from path
+	last_slash := strings.last_index(shell_path, "/")
+	shell_name := last_slash >= 0 ? shell_path[last_slash + 1:] : shell_path
+
+	return shell_name
+}
 
 // returns a row of 6 colored dot glyphs
 get_colored_dots :: proc() -> string {
@@ -126,6 +185,8 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 		fetch_fields.host_info,
 		FG_BLUE + "Kernel" + FG_RESET,
 		fetch_fields.kernel_info,
+		FG_BLUE + "Shell" + FG_RESET,
+		fetch_fields.shell_info,
 		FG_BLUE + "Desktop" + FG_RESET,
 		fetch_fields.desktop_info,
 		FG_BLUE + "Colors" + FG_RESET,

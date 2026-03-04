@@ -6,16 +6,20 @@ FetchFields :: struct {
 	os_name:      string,
 	host_info:    string,
 	kernel_info:  string,
+	shell_info:   string,
 	desktop_info: string,
 	colors:       string,
 }
 
 main :: proc() {
 	fetch_fields := FetchFields {
-		user_info = get_username_and_hostname(),
-		os_name   = get_osname(),
-		host_info = get_host_info(),
-		colors    = get_colored_dots(),
+		user_info    = get_username_and_hostname(),
+		os_name      = get_osname(),
+		host_info    = get_host_info(),
+		kernel_info  = get_kernel_info(),
+		shell_info   = get_shell_info(),
+		desktop_info = get_desktop_info(),
+		colors       = get_colored_dots(),
 	}
 
 	print_fetch_fields(&fetch_fields)
