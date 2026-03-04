@@ -6,8 +6,6 @@ FetchFields :: struct {
 	os_name:      string,
 	host_info:    string,
 	kernel_info:  string,
-	memory_info:  string,
-	swap_info:    string,
 	desktop_info: string,
 	colors:       string,
 }
