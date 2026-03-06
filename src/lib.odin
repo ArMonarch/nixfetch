@@ -198,6 +198,70 @@ get_uptime :: proc() -> string {
 	return strings.to_string(result)
 }
 
+// returns "used MiB / total MiB" from /proc/meminfo
+get_memory_info :: proc() -> string {
+	fd, err := os.open("/proc/meminfo", os.O_RDONLY)
+	if err != os.ERROR_NONE {
+		return "unknown"
+	}
+	defer os.close(fd)
+
+	buf: [4096]byte
+	n, read_err := os.read(fd, buf[:])
+	if read_err != os.ERROR_NONE || n == 0 {
+		return "unknown"
+	}
+
+	content := string(buf[:n])
+
+	total_kb := parse_meminfo_value(content, "MemTotal:")
+	available_kb := parse_meminfo_value(content, "MemAvailable:")
+
+	if total_kb < 0 || available_kb < 0 {
+		return "unknown"
+	}
+
+	used_gib := f64(total_kb - available_kb) / f64(1024 * 1024)
+	total_gib := f64(total_kb) / f64(1024 * 1024)
+	percentage_use := (used_gib / total_gib) * 100
+
+	return fmt.aprintf("%f GiB / %f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+}
+
+// parses a kB value from a /proc/meminfo line like "MemTotal:       16384000 kB"
+parse_meminfo_value :: proc(content: string, key: string) -> int {
+	idx := strings.index(content, key)
+	if idx == -1 {
+		return -1
+	}
+
+	// skip past the key
+	start := idx + len(key)
+
+	// skip whitespace
+	for start < len(content) && content[start] == ' ' {
+		start += 1
+	}
+
+	// read digits
+	end := start
+	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
+		end += 1
+	}
+
+	if start == end {
+		return -1
+	}
+
+	// parse the number
+	value := 0
+	for i := start; i < end; i += 1 {
+		value = value * 10 + int(content[i] - '0')
+	}
+
+	return value
+}
+
 // returns a row of 6 colored dot glyphs
 get_colored_dots :: proc() -> string {
 	GLYPH :: "  "
@@ -225,7 +289,7 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 	fmt.printfln(
 		nixos_logo_fmt(),
 		fetch_fields.user_info,
-		FG_BLUE + "System" + FG_RESET,
+		FG_BLUE + "OS" + FG_RESET,
 		fetch_fields.os_name,
 		FG_BLUE + "Host" + FG_RESET,
 		fetch_fields.host_info,
@@ -237,6 +301,8 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 		fetch_fields.desktop_info,
 		FG_BLUE + "Uptime" + FG_RESET,
 		fetch_fields.uptime,
+		FG_BLUE + "Memory" + FG_RESET,
+		fetch_fields.memory_info,
 		FG_BLUE + "Colors" + FG_RESET,
 		fetch_fields.colors,
 	)

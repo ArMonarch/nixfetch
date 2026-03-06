@@ -9,6 +9,7 @@ FetchFields :: struct {
 	shell_info:   string,
 	desktop_info: string,
 	uptime:       string,
+	memory_info:  string,
 	colors:       string,
 }
 
@@ -22,6 +23,7 @@ main :: proc() {
 		shell_info   = get_shell_info(),
 		desktop_info = get_desktop_info(),
 		uptime       = get_uptime(),
+		memory_info  = get_memory_info(),
 		colors       = get_colored_dots(),
 	}
 
