@@ -44,7 +44,7 @@
             echo "Initialized Odin Development Environment"
             echo "  ├── $(odin version)"
             echo "  ├── $(ols version)"
-            echo "  └── installed odinfmt"
+            echo "  └── $(just --version)"
           '';
         };
       };
