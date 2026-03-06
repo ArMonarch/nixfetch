@@ -78,7 +78,7 @@ nixos_logo_fmt :: proc() -> string {
 		&fmt,
 		"      ◢██████◣          ◢███◤           ",
 	)
-	strings.write_string(&fmt, "\n")
+	strings.write_string(&fmt, "%-16s: %s\n")
 	strings.write_string(
 		&fmt,
 		"     ◢███◤◥███◣        ◢███◤            ",

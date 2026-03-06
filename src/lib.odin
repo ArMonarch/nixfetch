@@ -225,7 +225,7 @@ get_memory_info :: proc() -> string {
 	total_gib := f64(total_kb) / f64(1024 * 1024)
 	percentage_use := (used_gib / total_gib) * 100
 
-	return fmt.aprintf("%f GiB / %f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+	return fmt.aprintf("%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
 }
 
 // parses a kB value from a /proc/meminfo line like "MemTotal:       16384000 kB"
@@ -260,6 +260,40 @@ parse_meminfo_value :: proc(content: string, key: string) -> int {
 	}
 
 	return value
+}
+
+// returns "used GiB / total GiB (X%)" from /proc/meminfo swap fields
+get_swap_info :: proc() -> string {
+	fd, err := os.open("/proc/meminfo", os.O_RDONLY)
+	if err != os.ERROR_NONE {
+		return "unknown"
+	}
+	defer os.close(fd)
+
+	buf: [4096]byte
+	n, read_err := os.read(fd, buf[:])
+	if read_err != os.ERROR_NONE || n == 0 {
+		return "unknown"
+	}
+
+	content := string(buf[:n])
+
+	total_kb := parse_meminfo_value(content, "SwapTotal:")
+	free_kb := parse_meminfo_value(content, "SwapFree:")
+
+	if total_kb < 0 || free_kb < 0 {
+		return "unknown"
+	}
+
+	if total_kb == 0 {
+		return "N/A"
+	}
+
+	used_gib := f64(total_kb - free_kb) / f64(1024 * 1024)
+	total_gib := f64(total_kb) / f64(1024 * 1024)
+	percentage_use := (used_gib / total_gib) * 100
+
+	return fmt.aprintf("%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
 }
 
 // returns a row of 6 colored dot glyphs
@@ -303,6 +337,8 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 		fetch_fields.uptime,
 		FG_BLUE + "Memory" + FG_RESET,
 		fetch_fields.memory_info,
+		FG_BLUE + "Swap" + FG_RESET,
+		fetch_fields.swap_info,
 		FG_BLUE + "Colors" + FG_RESET,
 		fetch_fields.colors,
 	)
