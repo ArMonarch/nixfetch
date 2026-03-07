@@ -2,7 +2,6 @@ package nixfetch
 
 import "core:fmt"
 import "core:os"
-import "core:os/os2"
 import "core:strings"
 import "core:sys/linux"
 import "core:terminal/ansi"
@@ -199,6 +198,40 @@ get_uptime :: proc() -> string {
 	return strings.to_string(result)
 }
 
+// parses a kB value from a /proc/meminfo line like "MemTotal:       16384000 kB"
+parse_meminfo_value :: proc(content: string, key: string) -> int {
+	idx := strings.index(content, key)
+	if idx == -1 {
+		return -1
+	}
+
+	// skip past the key
+	start := idx + len(key)
+
+	// skip whitespace
+	for start < len(content) && content[start] == ' ' {
+		start += 1
+	}
+
+	// read digits
+	end := start
+	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
+		end += 1
+	}
+
+	if start == end {
+		return -1
+	}
+
+	// parse the number
+	value := 0
+	for i := start; i < end; i += 1 {
+		value = value * 10 + int(content[i] - '0')
+	}
+
+	return value
+}
+
 // returns "used MiB / total MiB" from /proc/meminfo
 get_memory_info :: proc() -> string {
 	fd, err := os.open("/proc/meminfo", os.O_RDONLY)
@@ -322,38 +355,4 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 
 	result := strings.to_string(buffer)
 	fmt.print(result)
-}
-
-// parses a kB value from a /proc/meminfo line like "MemTotal:       16384000 kB"
-parse_meminfo_value :: proc(content: string, key: string) -> int {
-	idx := strings.index(content, key)
-	if idx == -1 {
-		return -1
-	}
-
-	// skip past the key
-	start := idx + len(key)
-
-	// skip whitespace
-	for start < len(content) && content[start] == ' ' {
-		start += 1
-	}
-
-	// read digits
-	end := start
-	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
-		end += 1
-	}
-
-	if start == end {
-		return -1
-	}
-
-	// parse the number
-	value := 0
-	for i := start; i < end; i += 1 {
-		value = value * 10 + int(content[i] - '0')
-	}
-
-	return value
 }
