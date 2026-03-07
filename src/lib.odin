@@ -2,6 +2,7 @@ package nixfetch
 
 import "core:fmt"
 import "core:os"
+import "core:os/os2"
 import "core:strings"
 import "core:sys/linux"
 import "core:terminal/ansi"
@@ -228,40 +229,6 @@ get_memory_info :: proc() -> string {
 	return fmt.aprintf("%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
 }
 
-// parses a kB value from a /proc/meminfo line like "MemTotal:       16384000 kB"
-parse_meminfo_value :: proc(content: string, key: string) -> int {
-	idx := strings.index(content, key)
-	if idx == -1 {
-		return -1
-	}
-
-	// skip past the key
-	start := idx + len(key)
-
-	// skip whitespace
-	for start < len(content) && content[start] == ' ' {
-		start += 1
-	}
-
-	// read digits
-	end := start
-	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
-		end += 1
-	}
-
-	if start == end {
-		return -1
-	}
-
-	// parse the number
-	value := 0
-	for i := start; i < end; i += 1 {
-		value = value * 10 + int(content[i] - '0')
-	}
-
-	return value
-}
-
 // returns "used GiB / total GiB (X%)" from /proc/meminfo swap fields
 get_swap_info :: proc() -> string {
 	fd, err := os.open("/proc/meminfo", os.O_RDONLY)
@@ -294,6 +261,14 @@ get_swap_info :: proc() -> string {
 	percentage_use := (used_gib / total_gib) * 100
 
 	return fmt.aprintf("%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+}
+
+// returns terminal name from TERM_PROGRAM env var
+get_terminal_info :: proc() -> string {
+	if value, found := os.lookup_env("TERM_PROGRAM"); found {
+		return value
+	}
+	return "unknown"
 }
 
 // returns a row of 6 colored dot glyphs
@@ -329,7 +304,7 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 		fetch_fields.host_info,
 		FG_BLUE + "Kernel" + FG_RESET,
 		fetch_fields.kernel_info,
-		FG_BLUE + "Shell" + FG_RESET,
+		FG_BLUE + "CPU" + FG_RESET,
 		fetch_fields.shell_info,
 		FG_BLUE + "Desktop" + FG_RESET,
 		fetch_fields.desktop_info,
@@ -339,10 +314,46 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 		fetch_fields.memory_info,
 		FG_BLUE + "Swap" + FG_RESET,
 		fetch_fields.swap_info,
+		FG_BLUE + "Terminal" + FG_RESET,
+		fetch_fields.terminal_info,
 		FG_BLUE + "Colors" + FG_RESET,
 		fetch_fields.colors,
 	)
 
 	result := strings.to_string(buffer)
 	fmt.print(result)
+}
+
+// parses a kB value from a /proc/meminfo line like "MemTotal:       16384000 kB"
+parse_meminfo_value :: proc(content: string, key: string) -> int {
+	idx := strings.index(content, key)
+	if idx == -1 {
+		return -1
+	}
+
+	// skip past the key
+	start := idx + len(key)
+
+	// skip whitespace
+	for start < len(content) && content[start] == ' ' {
+		start += 1
+	}
+
+	// read digits
+	end := start
+	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
+		end += 1
+	}
+
+	if start == end {
+		return -1
+	}
+
+	// parse the number
+	value := 0
+	for i := start; i < end; i += 1 {
+		value = value * 10 + int(content[i] - '0')
+	}
+
+	return value
 }
