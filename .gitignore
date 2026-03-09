@@ -1,0 +1,2 @@
+# ignore the target folder as it contains the build binary
+target/
