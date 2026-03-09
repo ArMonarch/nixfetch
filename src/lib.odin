@@ -325,31 +325,29 @@ get_colored_dots :: proc() -> string {
 }
 
 get_fetch_fields_array :: proc(fetch_fields: ^FetchFields) -> [dynamic]string {
-	array := make_dynamic_array_len_cap([dynamic]string, 0, 14)
+	KeyVal :: struct {
+		label, value: string,
+	}
 
+	array := make([dynamic]string, 0, 14)
 	append(&array, fetch_fields.user_info)
-	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "OS" + FG_RESET, fetch_fields.os_name))
-	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "Host" + FG_RESET, fetch_fields.host_info))
-	append(
-		&array,
-		fmt.aprintf("%.18s : %s", FG_BLUE + "Kernel" + FG_RESET, fetch_fields.kernel_info),
-	)
-	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "CPU" + FG_RESET, fetch_fields.shell_info))
-	append(
-		&array,
-		fmt.aprintf("%.18s : %s", FG_BLUE + "Desktop" + FG_RESET, fetch_fields.desktop_info),
-	)
-	append(
-		&array,
-		fmt.aprintf("%.18s : %s", FG_BLUE + "Memory" + FG_RESET, fetch_fields.memory_info),
-	)
-	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "Swap" + FG_RESET, fetch_fields.swap_info))
-	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "Uptime" + FG_RESET, fetch_fields.uptime))
-	append(
-		&array,
-		fmt.aprintf("%.18s : %s", FG_BLUE + "Terminal" + FG_RESET, fetch_fields.terminal_info),
-	)
-	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "Colors" + FG_RESET, fetch_fields.colors))
+
+	fields := [?]KeyVal {
+		{"OS", fetch_fields.os_name},
+		{"Host", fetch_fields.host_info},
+		{"Kernel", fetch_fields.kernel_info},
+		{"CPU", fetch_fields.shell_info},
+		{"Desktop", fetch_fields.desktop_info},
+		{"Memory", fetch_fields.memory_info},
+		{"Swap", fetch_fields.swap_info},
+		{"Terminal", fetch_fields.terminal_info},
+		{"Uptime", fetch_fields.uptime},
+		{"Colors", fetch_fields.colors},
+	}
+
+	for f in fields {
+		append(&array, fmt.aprintf("%s%.18s%s : %s", FG_BLUE, f.label, FG_RESET, f.value))
+	}
 
 	return array
 }
