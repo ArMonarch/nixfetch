@@ -324,35 +324,62 @@ get_colored_dots :: proc() -> string {
 	return strings.to_string(result)
 }
 
+get_fetch_fields_array :: proc(fetch_fields: ^FetchFields) -> [dynamic]string {
+	array := make_dynamic_array_len_cap([dynamic]string, 0, 14)
+
+	append(&array, fetch_fields.user_info)
+	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "OS" + FG_RESET, fetch_fields.os_name))
+	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "Host" + FG_RESET, fetch_fields.host_info))
+	append(
+		&array,
+		fmt.aprintf("%.18s : %s", FG_BLUE + "Kernel" + FG_RESET, fetch_fields.kernel_info),
+	)
+	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "CPU" + FG_RESET, fetch_fields.shell_info))
+	append(
+		&array,
+		fmt.aprintf("%.18s : %s", FG_BLUE + "Desktop" + FG_RESET, fetch_fields.desktop_info),
+	)
+	append(
+		&array,
+		fmt.aprintf("%.18s : %s", FG_BLUE + "Memory" + FG_RESET, fetch_fields.memory_info),
+	)
+	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "Swap" + FG_RESET, fetch_fields.swap_info))
+	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "Uptime" + FG_RESET, fetch_fields.uptime))
+	append(
+		&array,
+		fmt.aprintf("%.18s : %s", FG_BLUE + "Terminal" + FG_RESET, fetch_fields.terminal_info),
+	)
+	append(&array, fmt.aprintf("%.18s : %s", FG_BLUE + "Colors" + FG_RESET, fetch_fields.colors))
+
+	return array
+}
+
 // prints all fetch fields formatted inside the NixOS logo
 print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
-	buffer := strings.builder_make(len = 0, cap = 1024)
+	buffer := strings.builder_make(0, 2048)
+	nix_logo := nix_logo_black_white()
+	fetch_array := get_fetch_fields_array(fetch_fields)
 
-	fmt.printfln(
-		nixos_logo_fmt(),
-		fetch_fields.user_info,
-		FG_BLUE + "OS" + FG_RESET,
-		fetch_fields.os_name,
-		FG_BLUE + "Host" + FG_RESET,
-		fetch_fields.host_info,
-		FG_BLUE + "Kernel" + FG_RESET,
-		fetch_fields.kernel_info,
-		FG_BLUE + "CPU" + FG_RESET,
-		fetch_fields.shell_info,
-		FG_BLUE + "Desktop" + FG_RESET,
-		fetch_fields.desktop_info,
-		FG_BLUE + "Uptime" + FG_RESET,
-		fetch_fields.uptime,
-		FG_BLUE + "Memory" + FG_RESET,
-		fetch_fields.memory_info,
-		FG_BLUE + "Swap" + FG_RESET,
-		fetch_fields.swap_info,
-		FG_BLUE + "Terminal" + FG_RESET,
-		fetch_fields.terminal_info,
-		FG_BLUE + "Colors" + FG_RESET,
-		fetch_fields.colors,
-	)
+	min_len := min(len(nix_logo), len(fetch_array))
 
-	result := strings.to_string(buffer)
-	fmt.print(result)
+	for index in 0 ..< min_len {
+		strings.write_string(&buffer, nix_logo[index])
+		strings.write_string(&buffer, fetch_array[index])
+		strings.write_string(&buffer, "\n")
+	}
+
+	for index in min_len ..< len(nix_logo) {
+		strings.write_string(&buffer, nix_logo[index])
+		strings.write_string(&buffer, "\n")
+	}
+
+	for index in min_len ..< len(fetch_array) {
+		for _ in 0 ..< len(nix_logo[index]) {
+			strings.write_string(&buffer, " ")
+		}
+		strings.write_string(&buffer, fetch_array[index])
+		strings.write_string(&buffer, "\n")
+	}
+
+	fmt.println(strings.to_string(buffer))
 }

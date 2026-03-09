@@ -1,113 +1,49 @@
 package nixfetch
 
-import "core:strings"
+// :........................................:
+// :                                        :
+// :         ◢██◣     ◥███◣  ◢██◣           :
+// :         ◥███◣     ◥███◣◢███◤           :
+// :          ◥███◣     ◥██████◤            :
+// :      ◢███████████████████◤   ◢◣        :
+// :     ◢████████████████████◣  ◢██◣       :
+// :          ◢███◤        ◥███◣◢███◤       :
+// :         ◢███◤          ◥██████◤        :
+// :  ◢█████████◤            ◥█████████◣    :
+// :  ◥█████████◣            ◢█████████◤    :
+// :      ◢██████◣          ◢███◤           :
+// :     ◢███◤◥███◣        ◢███◤            :
+// :     ◥██◤  ◥████████████████████◤       :
+// :      ◥◤   ◢███████████████████◤        :
+// :          ◢██████◣     ◥███◣            :
+// :         ◢███◤◥███◣     ◥███◣           :
+// :         ◥██◤  ◥███◣     ◥██◤           :
+// :                                        :
+// :........................................:
 
 // builds the NixOS logo with format placeholders for system info on the right side
-nixos_logo_fmt :: proc() -> string {
-	// :........................................:
-	// :                                        :
-	// :         ◢██◣     ◥███◣  ◢██◣           :
-	// :         ◥███◣     ◥███◣◢███◤           :
-	// :          ◥███◣     ◥██████◤            :
-	// :      ◢███████████████████◤   ◢◣        :
-	// :     ◢████████████████████◣  ◢██◣       :
-	// :          ◢███◤        ◥███◣◢███◤       :
-	// :         ◢███◤          ◥██████◤        :
-	// :  ◢█████████◤            ◥█████████◣    :
-	// :  ◥█████████◣            ◢█████████◤    :
-	// :      ◢██████◣          ◢███◤           :
-	// :     ◢███◤◥███◣        ◢███◤            :
-	// :     ◥██◤  ◥████████████████████◤       :
-	// :      ◥◤   ◢███████████████████◤        :
-	// :          ◢██████◣     ◥███◣            :
-	// :         ◢███◤◥███◣     ◥███◣           :
-	// :         ◥██◤  ◥███◣     ◥██◤           :
-	// :                                        :
-	// :........................................:
+nix_logo_black_white :: proc() -> [dynamic]string {
+	nix_logo := make_dynamic_array([dynamic]string)
 
-	fmt := strings.builder_make(0)
-
-	strings.write_string(&fmt, "\n")
-	strings.write_string(
-		&fmt,
+	append(
+		&nix_logo,
 		"         ◢██◣     ◥███◣  ◢██◣           ",
-	)
-	strings.write_string(&fmt, "%s\n")
-	strings.write_string(
-		&fmt,
 		"         ◥███◣     ◥███◣◢███◤           ",
-	)
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"          ◥███◣     ◥██████◤            ",
-	)
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"      ◢███████████████████◤   ◢◣        ",
-	)
-
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"     ◢████████████████████◣  ◢██◣       ",
-	)
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"          ◢███◤        ◥███◣◢███◤       ",
-	)
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"         ◢███◤          ◥██████◤        ",
-	)
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"  ◢█████████◤            ◥█████████◣    ",
-	)
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"  ◥█████████◣            ◢█████████◤    ",
-	)
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"      ◢██████◣          ◢███◤           ",
-	)
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"     ◢███◤◥███◣        ◢███◤            ",
-	)
-	strings.write_string(&fmt, "%-18s: %s\n")
-	strings.write_string(
-		&fmt,
 		"     ◥██◤  ◥████████████████████◤       ",
-	)
-	strings.write_string(&fmt, "\n")
-	strings.write_string(
-		&fmt,
 		"      ◥◤   ◢███████████████████◤        ",
-	)
-	strings.write_string(&fmt, "\n")
-	strings.write_string(
-		&fmt,
 		"          ◢██████◣     ◥███◣            ",
-	)
-	strings.write_string(&fmt, "\n")
-	strings.write_string(
-		&fmt,
 		"         ◢███◤◥███◣     ◥███◣           ",
-	)
-	strings.write_string(&fmt, "\n")
-	strings.write_string(
-		&fmt,
 		"         ◥██◤  ◥███◣     ◥██◤           ",
 	)
 
-	return strings.to_string(fmt)
+	return nix_logo
 }
