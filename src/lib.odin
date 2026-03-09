@@ -355,7 +355,7 @@ get_fetch_fields_array :: proc(fetch_fields: ^FetchFields) -> [dynamic]string {
 // prints all fetch fields formatted inside the NixOS logo
 print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 	buffer := strings.builder_make(0, 2048)
-	nix_logo := nix_logo_black_white()
+	nix_logo := nix_logo_ansi_colored()
 	fetch_array := get_fetch_fields_array(fetch_fields)
 
 	min_len := min(len(nix_logo), len(fetch_array))
