@@ -329,7 +329,7 @@ get_fetch_fields_array :: proc(fetch_fields: ^FetchFields) -> [dynamic]string {
 		label, value: string,
 	}
 
-	array := make([dynamic]string, 0, 14)
+	array := make([dynamic]string)
 	append(&array, fetch_fields.user_info)
 
 	fields := [?]KeyVal {
@@ -360,19 +360,22 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 
 	min_len := min(len(nix_logo), len(fetch_array))
 
+	// Print logo lines side by side with fetch fields
 	for index in 0 ..< min_len {
 		strings.write_string(&buffer, nix_logo[index])
 		strings.write_string(&buffer, fetch_array[index])
 		strings.write_string(&buffer, "\n")
 	}
 
+	// Print remaining logo lines if the logo is taller than the fetch fields
 	for index in min_len ..< len(nix_logo) {
 		strings.write_string(&buffer, nix_logo[index])
 		strings.write_string(&buffer, "\n")
 	}
 
+	// Print remaining fetch fields with padding if there are more fields than logo lines
 	for index in min_len ..< len(fetch_array) {
-		for _ in 0 ..< len(nix_logo[index]) {
+		for _ in 0 ..< APPRENT_WIDTH {
 			strings.write_string(&buffer, " ")
 		}
 		strings.write_string(&buffer, fetch_array[index])
