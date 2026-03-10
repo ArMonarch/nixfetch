@@ -2,24 +2,17 @@
 
 A fast, minimal system information fetch tool for Linux, written in [Odin](https://odin-lang.org). Displays system info alongside a colored NixOS logo.
 
-```
-       ◢██◣     ◥███◣  ◢██◣          user@hostname~
-       ◥███◣     ◥███◣◢███◤          OS             : NixOS 25.05 (Warbler)
-        ◥███◣     ◥██████◤           Host           : ThinkPad X1 (ThinkPad)
-    ◢███████████████████◤   ◢◣       Kernel         : Linux 6.18.9-zen1 (x86_64)
-   ◢████████████████████◣  ◢██◣      Shell          : fish
-        ◢███◤        ◥███◣◢███◤      Desktop        : KDE (wayland)
-       ◢███◤          ◥██████◤       Memory         : 4.20 GiB / 15.42 GiB (27%)
-◢█████████◤            ◥█████████◣   Swap           : 0.00 GiB / 8.00 GiB (0%)
-◥█████████◣            ◢█████████◤   Terminal       : ghostty
-    ◢██████◣          ◢███◤          Uptime         : 3 hours, 42 minutes
-   ◢███◤◥███◣        ◢███◤           Colors         : ● ● ● ● ● ●
-   ◥██◤  ◥████████████████████◤
-    ◥◤   ◢███████████████████◤
-        ◢██████◣     ◥███◣
-       ◢███◤◥███◣     ◥███◣
-       ◥██◤  ◥███◣     ◥██◤
-```
+## Preview
+
+| Colored | 
+| ------- |
+| ![Colored NixOS logo](assets/preview_01.png) |
+
+
+| Black & White |
+| ------- |
+| ![Black & White NixOS logo](assets/preview_02.png) |
+
 
 ## Information Displayed
 
