@@ -1,5 +1,6 @@
 package nixfetch
 
+import "core:encoding/base64"
 import "core:fmt"
 import "core:os"
 import "core:strings"
@@ -353,7 +354,7 @@ get_fetch_fields_array :: proc(fetch_fields: ^FetchFields) -> [dynamic]string {
 }
 
 // prints all fetch fields formatted inside the NixOS logo
-print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
+pretty_print_fetch_fields_with_logo :: proc(fetch_fields: ^FetchFields) {
 	buffer := strings.builder_make(0, 2048)
 	nix_logo := nix_logo_ansi_colored()
 	fetch_array := get_fetch_fields_array(fetch_fields)
@@ -383,4 +384,42 @@ print_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 	}
 
 	fmt.println(strings.to_string(buffer))
+}
+
+// prints fetch fields with a custom image using the kitty graphics protocol
+// falls back to the logo variant if the image path is invalid
+pretty_print_fetch_fields_with_image :: proc(fetch_fields: ^FetchFields, image_path: string) {
+	if !os.is_file(image_path) {
+		fmt.println("Error: NIXFETCH_IMAGE is not a valid file")
+		pretty_print(fetch_fields)
+		return
+	}
+
+	if !strings.has_suffix(image_path, ".png") {
+		fmt.println("Error: NIXFETCH_IMAGE must be a png image")
+		pretty_print(fetch_fields)
+		return
+	}
+
+	// base64 encode the file path for the kitty graphics protocol
+	encoded_path, err := base64.encode(transmute([]byte)image_path)
+	array := get_fetch_fields_array(fetch_fields)
+
+	// print fetch fields first, padded left to leave space for the image
+	for item in array {
+		for _ in 0 ..< APPRENT_WIDTH {
+			fmt.print(" ")
+		}
+		fmt.println(item)
+	}
+
+	// move cursor back to the top and render the image via kitty graphics protocol
+	fmt.printf("\x1b[%dA", len(array))
+	fmt.printf("  \x1b_Ga=T,f=100,t=f,c=%d;%s\x1b\\", APPRENT_WIDTH - 5, encoded_path)
+}
+
+// overloaded proc: dispatches to logo or image variant based on arguments
+pretty_print :: proc {
+	pretty_print_fetch_fields_with_logo,
+	pretty_print_fetch_fields_with_image,
 }
