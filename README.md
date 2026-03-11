@@ -4,15 +4,25 @@ A fast, minimal system information fetch tool for Linux, written in [Odin](https
 
 ## Preview
 
-| Colored | 
-| ------- |
-| ![Colored NixOS logo](assets/preview_01.png) |
+![Colored NixOS logo](assets/preview_01.png)
 
+![Black & White NixOS logo](assets/preview_02.png)
 
-| Black & White |
-| ------- |
-| ![Black & White NixOS logo](assets/preview_02.png) |
+![Custom image preview 1](assets/preview_03.png)
 
+![Custom image preview 2](assets/preview_04.png)
+
+![Custom image preview 3](assets/preview_05.png)
+
+## Custom Image Support
+
+On terminals that support the [Kitty graphics protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol/) (e.g. Ghostty, Kitty), you can display a custom PNG image instead of the ANSI logo by setting the `NIXFETCH_IMAGE` environment variable:
+
+```sh
+NIXFETCH_IMAGE=/path/to/image.png nixfetch
+```
+
+If the terminal does not support the Kitty graphics protocol, or the variable is unset, nixfetch falls back to the default colored ANSI logo.
 
 ## Information Displayed
 
