@@ -347,7 +347,7 @@ get_fetch_fields_array :: proc(fetch_fields: ^FetchFields) -> [dynamic]string {
 	}
 
 	for f in fields {
-		append(&array, fmt.aprintf("%s%.18s%s : %s", FG_BLUE, f.label, FG_RESET, f.value))
+		append(&array, fmt.aprintf("%s%-8s %s : %s", FG_BLUE, f.label, FG_RESET, f.value))
 	}
 
 	return array

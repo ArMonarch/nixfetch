@@ -1,5 +1,5 @@
 {
-  description = "A Nix Flake Based Odin Development Environment & Package for microfetch";
+  description = "A Nix Flake Based Odin Development Environment & Package for nixfetch";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -47,6 +47,8 @@
             echo "  └── $(just --version)"
           '';
         };
+
+        packages.default = pkgs.callPackage ./nix/package.nix {};
       };
     };
 }
