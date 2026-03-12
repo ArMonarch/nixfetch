@@ -415,7 +415,7 @@ pretty_print_fetch_fields_with_image :: proc(fetch_fields: ^FetchFields, image_p
 
 	// move cursor back to the top and render the image via kitty graphics protocol
 	fmt.printf("\x1b[%dA", len(array))
-	fmt.printf("  \x1b_Ga=T,f=100,t=f,c=%d;%s\x1b\\", APPRENT_WIDTH - 5, encoded_path)
+	fmt.printfln("  \x1b_Ga=T,f=100,t=f,c=%d;%s\x1b\\", APPRENT_WIDTH - 5, encoded_path)
 }
 
 // overloaded proc: dispatches to logo or image variant based on arguments
