@@ -6,7 +6,7 @@
 }:
 stdenv.mkDerivation {
   pname = "nixfetch";
-  version = "0.0.1";
+  version = "0.1.0";
 
   src = lib.fileset.toSource {
     root = ../.;
@@ -16,7 +16,7 @@ stdenv.mkDerivation {
   };
 
   nativeBuildInputs = [
-    odin-bin."dev-2026-02".latest
+    odin-bin."dev-2026-03".latest
     autoPatchelfHook
   ];
 

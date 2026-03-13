@@ -36,7 +36,7 @@
 
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            odin-bin."dev-2026-02".latest
+            odin-bin."dev-2026-03".latest
             ols-bin."dev-2026-02".latest
             just
           ];

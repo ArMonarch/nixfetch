@@ -43,11 +43,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1772297256,
-        "narHash": "sha256-x9P07pTZonk7yuq2wdGYHHUcFGj+EE0QZtfM7sO1VxQ=",
+        "lastModified": 1773308690,
+        "narHash": "sha256-qjLM3pwhvbo4QQmX0kO63Mq4FF1zLDdNw1gGFFW3K2A=",
         "owner": "ArMonarch",
         "repo": "odin-overlay",
-        "rev": "1b25de486834b37d4c800ac455406d804d01c098",
+        "rev": "97b45bd7b09a4fb34bcc4b5cfdbcc4d70c076a7a",
         "type": "github"
       },
       "original": {

@@ -24,7 +24,7 @@ FG_RESET :: "\x1b[" + ansi.RESET + "m"
 // returns colored "user@hostname~" string
 get_username_and_hostname :: proc() -> string {
 	username: string
-	if value, found := os.lookup_env("USER"); found == true {
+	if value, found := os.lookup_env("USER", context.allocator); found == true {
 		username = value
 	} else {
 		username = "unknown_user"
@@ -52,10 +52,11 @@ get_username_and_hostname :: proc() -> string {
 
 // reads PRETTY_NAME from /etc/os-release
 get_osname :: proc() -> string {
-	data, success := os.read_entire_file("/etc/os-release")
-	if success != true {
+	data, err := os.read_entire_file("/etc/os-release", context.allocator)
+	if err != nil {
 		return "unknown"
 	}
+
 	content := string(data)
 
 	occurance_index := strings.index(content[:], "PRETTY_NAME=")
@@ -72,17 +73,19 @@ get_osname :: proc() -> string {
 
 // returns "product_name (product_family)" from DMI sysfs
 get_host_info :: proc() -> string {
-	product_name_data, success_product_name := os.read_entire_file(
+	product_name_data, product_name_err := os.read_entire_file(
 		"/sys/devices/virtual/dmi/id/product_name",
+		context.allocator,
 	)
-	if success_product_name != true {
+	if product_name_err != nil {
 		return "unknown"
 	}
 
-	product_family_data, success_product_family := os.read_entire_file(
+	product_family_data, product_family_err := os.read_entire_file(
 		"/sys/devices/virtual/dmi/id/product_family",
+		context.allocator,
 	)
-	if success_product_family != true {
+	if product_family_err != nil {
 		return "unknown"
 	}
 
@@ -119,14 +122,14 @@ get_kernel_info :: proc() -> string {
 get_desktop_info :: proc() -> string {
 	session: string
 
-	if value, success := os.lookup_env("XDG_CURRENT_DESKTOP"); success != true {
+	if value, success := os.lookup_env("XDG_CURRENT_DESKTOP", context.allocator); success != true {
 		session = "unknown"
 	} else {
 		session = value
 	}
 
 	desktop: string
-	if value, success := os.lookup_env("XDG_SESSION_TYPE"); success != true {
+	if value, success := os.lookup_env("XDG_SESSION_TYPE", context.allocator); success != true {
 		desktop = "unknown"
 	} else {
 		desktop = value
@@ -144,7 +147,7 @@ get_desktop_info :: proc() -> string {
 // returns shell name (basename of $SHELL)
 get_shell_info :: proc() -> string {
 	shell_path: string
-	if value, success := os.lookup_env("SHELL"); success != true {
+	if value, success := os.lookup_env("SHELL", context.allocator); success != true {
 		return "unknown"
 	} else {
 		shell_path = value
@@ -299,7 +302,7 @@ get_swap_info :: proc() -> string {
 
 // returns terminal name from TERM_PROGRAM env var
 get_terminal_info :: proc() -> string {
-	if value, found := os.lookup_env("TERM_PROGRAM"); found {
+	if value, found := os.lookup_env("TERM_PROGRAM", context.allocator); found {
 		return value
 	}
 	return "unknown"
