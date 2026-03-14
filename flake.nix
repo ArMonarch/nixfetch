@@ -39,6 +39,8 @@
             odin-bin."dev-2026-03".latest
             ols-bin."dev-2026-02".latest
             just
+            perf
+            valgrind
           ];
           shellHook = ''
             echo "Initialized Odin Development Environment"

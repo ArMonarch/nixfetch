@@ -31,6 +31,7 @@ main :: proc() {
 		terminal_info = get_terminal_info(),
 		colors        = get_colored_dots(),
 	}
+	defer drop(&fetch_fields)
 
 	// if environment variable `NIXFETCH_IMAGE=(image path)` is set
 	// then the programs tries to output fetch information with the image
@@ -42,6 +43,7 @@ main :: proc() {
 		"NIXFETCH_IMAGE",
 		context.allocator,
 	)
+	defer delete(nixfetch_image_value)
 
 	// use kitty graphics protocol to display the image if the terminal supports it
 	// otherwise fall back to the ansi colored nix logo
@@ -52,5 +54,4 @@ main :: proc() {
 	} else {
 		pretty_print(&fetch_fields)
 	}
-
 }
