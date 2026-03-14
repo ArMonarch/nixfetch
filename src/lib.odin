@@ -408,6 +408,7 @@ pretty_print_fetch_fields_with_image :: proc(fetch_fields: ^FetchFields, image_p
 	encoded_path, err := base64.encode(transmute([]byte)image_path)
 	array := get_fetch_fields_array(fetch_fields)
 
+	fmt.print("\n")
 	// print fetch fields first, padded left to leave space for the image
 	for item in array {
 		for _ in 0 ..< APPRENT_WIDTH {
