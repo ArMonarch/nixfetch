@@ -1,6 +1,8 @@
 package nixfetch
 
 import "core:os"
+import "core:sys/linux"
+
 // struct to hold all the fields we need in order to print the fetch.
 FetchFields :: struct {
 	user_info:     string,
@@ -18,8 +20,12 @@ FetchFields :: struct {
 
 // collect all system info and print the fetch output
 main :: proc() {
+	// get hostname via uname syscall
+	uts_name: linux.UTS_Name
+	linux.uname(&uts_name)
+
 	fetch_fields := FetchFields {
-		user_info     = get_username_and_hostname(),
+		user_info     = get_username_and_hostname(&uts_name),
 		os_name       = get_osname(),
 		host_info     = get_host_info(),
 		kernel_info   = get_kernel_info(),
@@ -50,8 +56,8 @@ main :: proc() {
 	if nixfetch_image_found &&
 	   nixfetch_image_value != "" &&
 	   (fetch_fields.terminal_info == "ghostty" || fetch_fields.terminal_info == "kitty") {
-		pretty_print(&fetch_fields, nixfetch_image_value)
+		// pretty_print(&fetch_fields, nixfetch_image_value)
 	} else {
-		pretty_print(&fetch_fields)
+		// pretty_print(&fetch_fields)
 	}
 }

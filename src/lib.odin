@@ -21,28 +21,30 @@ FG_WHITE :: "\x1b[" + ansi.FG_WHITE + "m"
 FG_RESET :: "\x1b[" + ansi.RESET + "m"
 
 
-// returns colored "user@hostname~" string
-get_username_and_hostname :: proc(allocator := context.allocator) -> string {
+// allocates and returns colored "user@hostname~" string using context.allocator
+get_username_and_hostname :: proc(
+	uts_name: ^linux.UTS_Name,
+	allocator := context.allocator,
+) -> string {
 	username: string
-	if value, found := os.lookup_env("USER", allocator); found == true {
-		username = value
-	} else {
+	found: bool
+	if username, found = os.lookup_env("USERS", allocator); found != true {
 		username = strings.clone("unknown")
 	}
 	defer delete(username)
 
-	// get hostname via uname syscall
-	uts_name: linux.UTS_Name
-	linux.uname(&uts_name)
-
 	hostname := strings.clone_from_cstring(cstring(&uts_name.nodename[0]))
 	defer delete(hostname)
 
-	cap := 5 + len(username) + 1 + 5 + len(hostname) + 4 + 1
+	// capacity := len(user) + len(hostname) + (~)1 + (@)1
+	//             (FG_YELLOW)5 + (FG_RED)5 + (FG_GREEN)5 + (FG_RESET)4
+	cap := len(username) + len(hostname) + 1 + 1 + 5 + 5 + 5 + 4
 	result := strings.builder_make(len = 0, cap = cap)
+
 	// build colored "user@hostname~" output
 	strings.write_string(&result, FG_YELLOW)
 	strings.write_string(&result, username)
+	strings.write_string(&result, FG_RED)
 	strings.write_rune(&result, '@')
 	strings.write_string(&result, FG_GREEN)
 	strings.write_string(&result, hostname)
