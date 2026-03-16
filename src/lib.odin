@@ -367,17 +367,16 @@ pretty_print_fetch_fields_with_logo :: proc(ffields: ^FetchFields) {
 	defer delete(nix_logo)
 
 
-	// TODO: comment this
+	// build key-value pairs from fetch fields for side-by-side printing with the logo
 	fetches := make([dynamic]KeyVal)
 	defer delete(fetches)
 	ffields_fmts(&fetches, ffields)
 	min_len := min(len(nix_logo), len(fetches))
 
-	fmt.print(cap(fetches), "\n")
 	// Print logo lines side by side with fetch fields
 	for index in 0 ..< min_len {
 		strings.write_string(&buffer, nix_logo[index])
-		fmt.sbprintf(&buffer, "%-8s : %s", fetches[index].label, fetches[index].value^)
+		fmt.sbprintf(&buffer, "%-18s : %s", fetches[index].label, fetches[index].value^)
 		strings.write_string(&buffer, "\n")
 	}
 
@@ -392,7 +391,7 @@ pretty_print_fetch_fields_with_logo :: proc(ffields: ^FetchFields) {
 		for _ in 0 ..< APPRENT_WIDTH {
 			strings.write_string(&buffer, " ")
 		}
-		fmt.sbprintf(&buffer, "%-8s : %s", fetches[index].label, fetches[index].value^)
+		fmt.sbprintf(&buffer, "%-18s : %s", fetches[index].label, fetches[index].value^)
 		strings.write_string(&buffer, "\n")
 	}
 
@@ -431,7 +430,7 @@ pretty_print_fetch_fields_with_image :: proc(ffields: ^FetchFields, image_path: 
 		for _ in 0 ..< APPRENT_WIDTH {
 			fmt.print(" ")
 		}
-		fmt.printfln("%-8s : %s", item.label, item.value^)
+		fmt.printfln("%-18s : %s", item.label, item.value^)
 	}
 
 	// move cursor back to the top and render the image via kitty graphics protocol
@@ -445,7 +444,8 @@ pretty_print :: proc {
 	pretty_print_fetch_fields_with_image,
 }
 
-// TODO: comment that all the values are allocated on the heap and needs to be cleared
+// populates a FetchFields struct by gathering all system info.
+// all string values are heap-allocated and must be freed via drop().
 new_ffields :: proc(ff: ^FetchFields, uts_name: ^linux.UTS_Name) {
 	ff^ = FetchFields {
 		user_info     = get_username_and_hostname(uts_name),
@@ -462,7 +462,7 @@ new_ffields :: proc(ff: ^FetchFields, uts_name: ^linux.UTS_Name) {
 	}
 }
 
-// TODO: comment that this procedure clears all the fetch_fields values
+// frees all heap-allocated string values in a FetchFields struct.
 drop_ffields :: proc(fetch_fields: ^FetchFields) {
 	// delete all fetch_fields values
 	defer delete(fetch_fields.user_info)
@@ -478,7 +478,7 @@ drop_ffields :: proc(fetch_fields: ^FetchFields) {
 	defer delete(fetch_fields.colors)
 }
 
-//  TODO: comment
+// overloaded destructor: dispatches to the appropriate drop procedure.
 drop :: proc {
 	drop_ffields,
 }

@@ -24,7 +24,7 @@ main :: proc() {
 	uts_name: linux.UTS_Name
 	linux.uname(&uts_name)
 
-	// TODO: comment this
+	// gather all system info into fetch fields; drop() frees all heap allocations on exit
 	ffields: FetchFields
 	new_ffields(&ffields, &uts_name)
 	defer drop(&ffields)
