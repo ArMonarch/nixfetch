@@ -21,28 +21,30 @@ FG_WHITE :: "\x1b[" + ansi.FG_WHITE + "m"
 FG_RESET :: "\x1b[" + ansi.RESET + "m"
 
 
-// returns colored "user@hostname~" string
-get_username_and_hostname :: proc(allocator := context.allocator) -> string {
+// allocates and returns colored "user@hostname~" string using context.allocator
+get_username_and_hostname :: proc(
+	uts_name: ^linux.UTS_Name,
+	allocator := context.allocator,
+) -> string {
 	username: string
-	if value, found := os.lookup_env("USER", allocator); found == true {
-		username = value
-	} else {
+	found: bool
+	if username, found = os.lookup_env("USER", allocator); found != true {
 		username = strings.clone("unknown")
 	}
 	defer delete(username)
 
-	// get hostname via uname syscall
-	uts_name: linux.UTS_Name
-	linux.uname(&uts_name)
-
 	hostname := strings.clone_from_cstring(cstring(&uts_name.nodename[0]))
 	defer delete(hostname)
 
-	cap := 5 + len(username) + 1 + 5 + len(hostname) + 4 + 1
+	// capacity := len(user) + len(hostname) + (~)1 + (@)1
+	//             (FG_YELLOW)5 + (FG_RED)5 + (FG_GREEN)5 + (FG_RESET)4
+	cap := len(username) + len(hostname) + 1 + 1 + 5 + 5 + 5 + 4
 	result := strings.builder_make(len = 0, cap = cap)
+
 	// build colored "user@hostname~" output
 	strings.write_string(&result, FG_YELLOW)
 	strings.write_string(&result, username)
+	strings.write_string(&result, FG_RED)
 	strings.write_rune(&result, '@')
 	strings.write_string(&result, FG_GREEN)
 	strings.write_string(&result, hostname)
@@ -102,10 +104,7 @@ get_host_info :: proc(allocator := context.allocator) -> string {
 }
 
 // returns "sysname release (machine)" via uname syscall
-get_kernel_info :: proc() -> string {
-	uts_name: linux.UTS_Name
-	linux.uname(&uts_name)
-
+get_kernel_info :: proc(uts_name: ^linux.UTS_Name) -> string {
 	system := string(cstring(&uts_name.sysname[0]))
 	release := string(cstring(&uts_name.release[0]))
 	machine := string(cstring(&uts_name.machine[0]))
@@ -123,27 +122,24 @@ get_kernel_info :: proc() -> string {
 
 // returns "desktop_name (session_type)" from XDG env vars
 get_desktop_info :: proc(allocator := context.allocator) -> string {
+	desktop: string
 	session: string
+	success: bool
+
+	if desktop, success = os.lookup_env("XDG_CURRENT_DESKTOP", allocator); success != true {
+		session = strings.clone("unknown", allocator)
+	}
+	defer delete(desktop)
+
+	if session, success = os.lookup_env("XDG_SESSION_TYPE", allocator); success != true {
+		desktop = strings.clone("unknown", allocator)
+	}
 	defer delete(session)
 
-	if value, success := os.lookup_env("XDG_CURRENT_DESKTOP", allocator); success != true {
-		session = strings.clone("unknown", allocator)
-	} else {
-		session = value
-	}
-
-	desktop: string
-	defer delete(desktop)
-	if value, success := os.lookup_env("XDG_SESSION_TYPE", allocator); success != true {
-		desktop = strings.clone("unknown", allocator)
-	} else {
-		desktop = value
-	}
-
-	result := strings.builder_make(0, len(session) + len(desktop) + 3)
-	strings.write_string(&result, session)
-	strings.write_string(&result, " (")
+	result := strings.builder_make(0, len(desktop) + len(session) + 3)
 	strings.write_string(&result, desktop)
+	strings.write_string(&result, " (")
+	strings.write_string(&result, session)
 	strings.write_string(&result, ")")
 	return strings.to_string(result)
 }
@@ -152,10 +148,9 @@ get_desktop_info :: proc(allocator := context.allocator) -> string {
 // returns shell name (basename of $SHELL)
 get_shell_info :: proc() -> string {
 	shell_path: string
-	if value, success := os.lookup_env("SHELL", context.allocator); success != true {
+	success: bool
+	if shell_path, success = os.lookup_env("SHELL", context.allocator); success != true {
 		return strings.clone("unknown")
-	} else {
-		shell_path = value
 	}
 	defer delete(shell_path)
 
@@ -245,14 +240,14 @@ parse_meminfo_value :: proc(content: string, key: string) -> int {
 // returns "used MiB / total MiB" from /proc/meminfo
 get_memory_info :: proc() -> string {
 	fd, err := os.open("/proc/meminfo", os.O_RDONLY)
-	if err != os.ERROR_NONE {
+	if err != nil {
 		return strings.clone("unknown")
 	}
 	defer os.close(fd)
 
 	buf: [2096]byte
 	n, read_err := os.read(fd, buf[:])
-	if read_err != os.ERROR_NONE || n == 0 {
+	if read_err != nil || n == 0 {
 		return strings.clone("unknown")
 	}
 
@@ -269,7 +264,10 @@ get_memory_info :: proc() -> string {
 	total_gib := f64(total_kb) / f64(1024 * 1024)
 	percentage_use := (used_gib / total_gib) * 100
 
-	return fmt.aprintf("%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+	result := strings.builder_make(len = 0, cap = 128)
+	fmt.sbprintf(&result, "%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+
+	return strings.to_string(result)
 }
 
 // returns "used GiB / total GiB (X%)" from /proc/meminfo swap fields
@@ -303,7 +301,10 @@ get_swap_info :: proc() -> string {
 	total_gib := f64(total_kb) / f64(1024 * 1024)
 	percentage_use := (used_gib / total_gib) * 100
 
-	return fmt.aprintf("%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+	result := strings.builder_make(len = 0, cap = 128)
+	fmt.sbprintf(&result, "%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+
+	return strings.to_string(result)
 }
 
 // returns terminal name from TERM_PROGRAM env var
@@ -335,52 +336,48 @@ get_colored_dots :: proc() -> string {
 	return strings.to_string(result)
 }
 
-get_fetch_fields_array :: proc(fetch_fields: ^FetchFields) -> [dynamic]string {
-	KeyVal :: struct {
-		label, value: string,
-	}
+KeyVal :: struct {
+	label: string,
+	value: ^string,
+}
 
-	array := make([dynamic]string)
-	user_info := strings.clone(fetch_fields.user_info)
-	append(&array, user_info)
+ffields_fmts :: proc(target: ^[dynamic]KeyVal, ffields: ^FetchFields) {
+	append(
+		target,
+		KeyVal{FG_BLUE + "OS" + FG_RESET, &ffields.os_name},
+		KeyVal{FG_BLUE + "Host" + FG_RESET, &ffields.host_info},
+		KeyVal{FG_BLUE + "Kernel" + FG_RESET, &ffields.kernel_info},
+		KeyVal{FG_BLUE + "Shell" + FG_RESET, &ffields.shell_info},
+		KeyVal{FG_BLUE + "Desktop" + FG_RESET, &ffields.desktop_info},
+		KeyVal{FG_BLUE + "Memory" + FG_RESET, &ffields.memory_info},
+		KeyVal{FG_BLUE + "Swap" + FG_RESET, &ffields.swap_info},
+		KeyVal{FG_BLUE + "Terminal" + FG_RESET, &ffields.terminal_info},
+		KeyVal{FG_BLUE + "Uptime" + FG_RESET, &ffields.uptime},
+		KeyVal{FG_BLUE + "Colors" + FG_RESET, &ffields.colors},
+	)
 
-	fields := [?]KeyVal {
-		{"OS", fetch_fields.os_name},
-		{"Host", fetch_fields.host_info},
-		{"Kernel", fetch_fields.kernel_info},
-		{"Shell", fetch_fields.shell_info},
-		{"Desktop", fetch_fields.desktop_info},
-		{"Memory", fetch_fields.memory_info},
-		{"Swap", fetch_fields.swap_info},
-		{"Terminal", fetch_fields.terminal_info},
-		{"Uptime", fetch_fields.uptime},
-		{"Colors", fetch_fields.colors},
-	}
-
-	for f in fields {
-		formatted_string := fmt.aprintf("%s%-8s %s : %s", FG_BLUE, f.label, FG_RESET, f.value)
-		append(&array, formatted_string)
-	}
-
-	return array
+	// fmt.sbprintf(&builder, "%s%-8s %s : %s", FG_BLUE, f.label, FG_RESET, f.value)
 }
 
 // prints all fetch fields formatted inside the NixOS logo
-pretty_print_fetch_fields_with_logo :: proc(fetch_fields: ^FetchFields) {
+pretty_print_fetch_fields_with_logo :: proc(ffields: ^FetchFields) {
 	buffer := strings.builder_make(0, 4096)
 	defer strings.builder_destroy(&buffer)
-	nix_logo := nix_logo_ansi_colored()
+	nix_logo := nix_logo_black_white()
 	defer delete(nix_logo)
-	fetch_array := get_fetch_fields_array(fetch_fields)
-	defer delete(fetch_array)
-	defer drop(&fetch_array)
 
-	min_len := min(len(nix_logo), len(fetch_array))
 
+	// TODO: comment this
+	fetches := make([dynamic]KeyVal)
+	defer delete(fetches)
+	ffields_fmts(&fetches, ffields)
+	min_len := min(len(nix_logo), len(fetches))
+
+	fmt.print(cap(fetches), "\n")
 	// Print logo lines side by side with fetch fields
 	for index in 0 ..< min_len {
 		strings.write_string(&buffer, nix_logo[index])
-		strings.write_string(&buffer, fetch_array[index])
+		fmt.sbprintf(&buffer, "%-8s : %s", fetches[index].label, fetches[index].value^)
 		strings.write_string(&buffer, "\n")
 	}
 
@@ -391,11 +388,11 @@ pretty_print_fetch_fields_with_logo :: proc(fetch_fields: ^FetchFields) {
 	}
 
 	// Print remaining fetch fields with padding if there are more fields than logo lines
-	for index in min_len ..< len(fetch_array) {
+	for index in min_len ..< len(fetches) {
 		for _ in 0 ..< APPRENT_WIDTH {
 			strings.write_string(&buffer, " ")
 		}
-		strings.write_string(&buffer, fetch_array[index])
+		fmt.sbprintf(&buffer, "%-8s : %s", fetches[index].label, fetches[index].value^)
 		strings.write_string(&buffer, "\n")
 	}
 
@@ -404,16 +401,16 @@ pretty_print_fetch_fields_with_logo :: proc(fetch_fields: ^FetchFields) {
 
 // prints fetch fields with a custom image using the kitty graphics protocol
 // falls back to the logo variant if the image path is invalid
-pretty_print_fetch_fields_with_image :: proc(fetch_fields: ^FetchFields, image_path: string) {
+pretty_print_fetch_fields_with_image :: proc(ffields: ^FetchFields, image_path: string) {
 	if !os.is_file(image_path) {
 		fmt.println("Error: NIXFETCH_IMAGE is not a valid file")
-		pretty_print(fetch_fields)
+		pretty_print(ffields)
 		return
 	}
 
 	if !strings.has_suffix(image_path, ".png") {
 		fmt.println("Error: NIXFETCH_IMAGE must be a png image")
-		pretty_print(fetch_fields)
+		pretty_print(ffields)
 		return
 	}
 
@@ -424,21 +421,21 @@ pretty_print_fetch_fields_with_image :: proc(fetch_fields: ^FetchFields, image_p
 	}
 	defer delete(encoded_path)
 
-	array := get_fetch_fields_array(fetch_fields)
-	defer delete(array)
-	defer drop(&array)
+	fetches := make([dynamic]KeyVal)
+	defer delete(fetches)
+	ffields_fmts(&fetches, ffields)
 
 	fmt.print("\n")
 	// print fetch fields first, padded left to leave space for the image
-	for item in array {
+	for item in fetches {
 		for _ in 0 ..< APPRENT_WIDTH {
 			fmt.print(" ")
 		}
-		fmt.println(item)
+		fmt.printfln("%-8s : %s", item.label, item.value^)
 	}
 
 	// move cursor back to the top and render the image via kitty graphics protocol
-	fmt.printf("\x1b[%dA", len(array))
+	fmt.printf("\x1b[%dA", len(fetches))
 	fmt.printfln("  \x1b_Ga=T,f=100,t=f,c=%d;%s\x1b\\", APPRENT_WIDTH - 5, encoded_path)
 }
 
@@ -448,7 +445,25 @@ pretty_print :: proc {
 	pretty_print_fetch_fields_with_image,
 }
 
-drop_fetch_fields :: proc(fetch_fields: ^FetchFields) {
+// TODO: comment that all the values are allocated on the heap and needs to be cleared
+new_ffields :: proc(ff: ^FetchFields, uts_name: ^linux.UTS_Name) {
+	ff^ = FetchFields {
+		user_info     = get_username_and_hostname(uts_name),
+		os_name       = get_osname(),
+		host_info     = get_host_info(),
+		kernel_info   = get_kernel_info(uts_name),
+		shell_info    = get_shell_info(),
+		desktop_info  = get_desktop_info(),
+		uptime        = get_uptime(),
+		memory_info   = get_memory_info(),
+		swap_info     = get_swap_info(),
+		terminal_info = get_terminal_info(),
+		colors        = get_colored_dots(),
+	}
+}
+
+// TODO: comment that this procedure clears all the fetch_fields values
+drop_ffields :: proc(fetch_fields: ^FetchFields) {
 	// delete all fetch_fields values
 	defer delete(fetch_fields.user_info)
 	defer delete(fetch_fields.os_name)
@@ -463,13 +478,7 @@ drop_fetch_fields :: proc(fetch_fields: ^FetchFields) {
 	defer delete(fetch_fields.colors)
 }
 
-drop_array_strings :: proc(array: ^[dynamic]string) {
-	for val in array {
-		delete(val)
-	}
-}
-
+//  TODO: comment
 drop :: proc {
-	drop_fetch_fields,
-	drop_array_strings,
+	drop_ffields,
 }
