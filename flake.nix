@@ -46,7 +46,9 @@
             echo "Initialized Odin Development Environment"
             echo "  ├── $(odin version)"
             echo "  ├── $(ols version)"
-            echo "  └── $(just --version)"
+            echo "  ├── $(just --version)"
+            echo "  ├── $(perf version)"
+            echo "  └── $(valgrind --version)"
           '';
         };
 
