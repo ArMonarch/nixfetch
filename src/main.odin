@@ -24,20 +24,10 @@ main :: proc() {
 	uts_name: linux.UTS_Name
 	linux.uname(&uts_name)
 
-	fetch_fields := FetchFields {
-		user_info    = get_username_and_hostname(&uts_name),
-		os_name      = get_osname(),
-		host_info    = get_host_info(),
-		kernel_info  = get_kernel_info(&uts_name),
-		shell_info   = get_shell_info(),
-		desktop_info = get_desktop_info(),
-		// uptime        = get_uptime(),
-		// memory_info   = get_memory_info(),
-		// swap_info     = get_swap_info(),
-		// terminal_info = get_terminal_info(),
-		// colors        = get_colored_dots(),
-	}
-	defer drop(&fetch_fields)
+	// TODO: comment this
+	ffields: FetchFields
+	new_ffields(&ffields, &uts_name)
+	defer drop(&ffields)
 
 	// if environment variable `NIXFETCH_IMAGE=(image path)` is set
 	// then the programs tries to output fetch information with the image
@@ -55,9 +45,9 @@ main :: proc() {
 	// otherwise fall back to the ansi colored nix logo
 	if nixfetch_image_found &&
 	   nixfetch_image_value != "" &&
-	   (fetch_fields.terminal_info == "ghostty" || fetch_fields.terminal_info == "kitty") {
-		// pretty_print(&fetch_fields, nixfetch_image_value)
+	   (ffields.terminal_info == "ghostty" || ffields.terminal_info == "kitty") {
+		pretty_print(&ffields, nixfetch_image_value)
 	} else {
-		// pretty_print(&fetch_fields)
+		pretty_print(&ffields)
 	}
 }
