@@ -61,7 +61,10 @@ jobs:
       - uses: cachix/install-nix-action@v31
 
       - name: Build ${{ matrix.name }} binary
-        run: nix develop --command odin build src -out:nixfetch-${{ matrix.name }} -o:aggressive -target:${{ matrix.target }}
+        run: nix build .#default
+
+      - name: Copy binary
+        run: cp result/bin/nixfetch nixfetch-${{ matrix.name }}
 
       - uses: actions/upload-artifact@v4
         with:
