@@ -27,6 +27,11 @@ build-aggressive:
   [ -d target/aggressive ] || mkdir -p target/aggressive
   odin build {{src}} -out:target/aggressive/{{name}} -o:aggressive
 
+# build profile binary (aggressive optimization + debug symbols for profiling)
+build-profile:
+  [ -d target/profile ] || mkdir -p target/profile
+  odin build {{src}} -out:target/profile/{{name}} -o:aggressive -debug
+
 # build and run debug binary
 run-debug: build-debug
   ./target/debug/{{name}}
@@ -48,9 +53,12 @@ run-aggressive: build-aggressive
   ./target/aggressive/{{name}}
 
 # build and test memleak with valgrind
-test-valgrind: build-debug
-  valgrind --track-origins=yes --leak-check=full -s ./target/debug/nixfetch
+memcheck: build-debug
+  valgrind --tool=memcheck --track-origins=yes --leak-check=full -s ./target/debug/nixfetch
+
+profile: build-profile
+  perf record -F 9999 -g --call-graph dwarf -- ./target/profile/{{name}}
+  perf script report flamegraph
 
 alias build:= build-debug
 alias run:= run-debug
-alias test-mem := test-valgrind
