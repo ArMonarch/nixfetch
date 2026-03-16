@@ -122,27 +122,24 @@ get_kernel_info :: proc(uts_name: ^linux.UTS_Name) -> string {
 
 // returns "desktop_name (session_type)" from XDG env vars
 get_desktop_info :: proc(allocator := context.allocator) -> string {
+	desktop: string
 	session: string
+	success: bool
+
+	if desktop, success = os.lookup_env("XDG_CURRENT_DESKTOP", allocator); success != true {
+		session = strings.clone("unknown", allocator)
+	}
+	defer delete(desktop)
+
+	if session, success = os.lookup_env("XDG_SESSION_TYPE", allocator); success != true {
+		desktop = strings.clone("unknown", allocator)
+	}
 	defer delete(session)
 
-	if value, success := os.lookup_env("XDG_CURRENT_DESKTOP", allocator); success != true {
-		session = strings.clone("unknown", allocator)
-	} else {
-		session = value
-	}
-
-	desktop: string
-	defer delete(desktop)
-	if value, success := os.lookup_env("XDG_SESSION_TYPE", allocator); success != true {
-		desktop = strings.clone("unknown", allocator)
-	} else {
-		desktop = value
-	}
-
-	result := strings.builder_make(0, len(session) + len(desktop) + 3)
-	strings.write_string(&result, session)
-	strings.write_string(&result, " (")
+	result := strings.builder_make(0, len(desktop) + len(session) + 3)
 	strings.write_string(&result, desktop)
+	strings.write_string(&result, " (")
+	strings.write_string(&result, session)
 	strings.write_string(&result, ")")
 	return strings.to_string(result)
 }
@@ -151,10 +148,9 @@ get_desktop_info :: proc(allocator := context.allocator) -> string {
 // returns shell name (basename of $SHELL)
 get_shell_info :: proc() -> string {
 	shell_path: string
-	if value, success := os.lookup_env("SHELL", context.allocator); success != true {
+	success: bool
+	if shell_path, success = os.lookup_env("SHELL", context.allocator); success != true {
 		return strings.clone("unknown")
-	} else {
-		shell_path = value
 	}
 	defer delete(shell_path)
 
