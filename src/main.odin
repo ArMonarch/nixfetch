@@ -28,7 +28,7 @@ main :: proc() {
 		user_info     = get_username_and_hostname(&uts_name),
 		os_name       = get_osname(),
 		host_info     = get_host_info(),
-		kernel_info   = get_kernel_info(),
+		kernel_info   = get_kernel_info(&uts_name),
 		shell_info    = get_shell_info(),
 		desktop_info  = get_desktop_info(),
 		uptime        = get_uptime(),
@@ -56,8 +56,8 @@ main :: proc() {
 	if nixfetch_image_found &&
 	   nixfetch_image_value != "" &&
 	   (fetch_fields.terminal_info == "ghostty" || fetch_fields.terminal_info == "kitty") {
-		// pretty_print(&fetch_fields, nixfetch_image_value)
+		pretty_print(&fetch_fields, nixfetch_image_value)
 	} else {
-		// pretty_print(&fetch_fields)
+		pretty_print(&fetch_fields)
 	}
 }

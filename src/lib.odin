@@ -104,10 +104,7 @@ get_host_info :: proc(allocator := context.allocator) -> string {
 }
 
 // returns "sysname release (machine)" via uname syscall
-get_kernel_info :: proc() -> string {
-	uts_name: linux.UTS_Name
-	linux.uname(&uts_name)
-
+get_kernel_info :: proc(uts_name: ^linux.UTS_Name) -> string {
 	system := string(cstring(&uts_name.sysname[0]))
 	release := string(cstring(&uts_name.release[0]))
 	machine := string(cstring(&uts_name.machine[0]))
