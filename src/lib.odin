@@ -240,21 +240,23 @@ parse_meminfo_value :: proc(content: string, key: string) -> int {
 // returns "used MiB / total MiB" from /proc/meminfo
 get_memory_info :: proc() -> string {
 	fd, err := os.open("/proc/meminfo", os.O_RDONLY)
-	if err != os.ERROR_NONE {
+	if err != nil {
 		return strings.clone("unknown")
 	}
 	defer os.close(fd)
 
 	buf: [2096]byte
 	n, read_err := os.read(fd, buf[:])
-	if read_err != os.ERROR_NONE || n == 0 {
+	if read_err != nil || n == 0 {
 		return strings.clone("unknown")
 	}
 
 	content := string(buf[:n])
 
-	total_kb := parse_meminfo_value(content, "MemTotal:")
-	available_kb := parse_meminfo_value(content, "MemAvailable:")
+	// total_kb := parse_meminfo_value(content, "MemTotal:")
+	// available_kb := parse_meminfo_value(content, "MemAvailable:")
+	total_kb := 10
+	available_kb := 5
 
 	if total_kb < 0 || available_kb < 0 {
 		return strings.clone("unknown")
@@ -264,7 +266,10 @@ get_memory_info :: proc() -> string {
 	total_gib := f64(total_kb) / f64(1024 * 1024)
 	percentage_use := (used_gib / total_gib) * 100
 
-	return fmt.aprintf("%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+	result := strings.builder_make(len = 0, cap = 128)
+	fmt.sbprintf(&result, "%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+
+	return strings.to_string(result)
 }
 
 // returns "used GiB / total GiB (X%)" from /proc/meminfo swap fields
