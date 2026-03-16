@@ -303,7 +303,10 @@ get_swap_info :: proc() -> string {
 	total_gib := f64(total_kb) / f64(1024 * 1024)
 	percentage_use := (used_gib / total_gib) * 100
 
-	return fmt.aprintf("%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+	result := strings.builder_make(len = 0, cap = 128)
+	fmt.sbprintf(&result, "%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+
+	return strings.to_string(result)
 }
 
 // returns terminal name from TERM_PROGRAM env var
