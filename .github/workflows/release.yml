@@ -44,24 +44,24 @@ jobs:
       matrix:
         include:
           - name: x86_64-linux
-            target: linux_amd64
-            qemu: amd64
+            package: .#packages.x86_64-linux.default
           - name: aarch64-linux
-            target: linux_arm64
-            qemu: arm64
+            package: .#packages.aarch64-linux.default
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v3
         with:
-          platforms: ${{ matrix.qemu }}
+          platforms: amd64,arm64
 
       - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            extra-platforms = x86_64-linux,aarch64-linux
 
       - name: Build ${{ matrix.name }} binary
-        run: nix build .#default
+        run: nix build ${{ matrix.package }}
 
       - name: Copy binary
         run: cp result/bin/nixfetch nixfetch-${{ matrix.name }}
