@@ -38,6 +38,7 @@
           packages = with pkgs; [
             odin-bin."dev-2026-03".latest
             ols-bin."dev-2026-02".latest
+            llvmPackages.bintools-unwrapped
             valgrind
             just
             perf

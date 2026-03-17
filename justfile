@@ -5,32 +5,32 @@ src := "src"
 # build debug binary (no optimization)
 build-debug:
   [ -d target/debug ] || mkdir -p target/debug
-  odin build {{src}} -out:target/debug/{{name}} -o:none -debug
+  odin build {{src}} -build-mode:exe -out:target/debug/{{name}} -o:none -debug -linker:lld
 
 # build minimal binary (minimal optimization)
 build-minimal:
   [ -d target/minimal ] || mkdir -p target/minimal
-  odin build {{src}} -out:target/minimal/{{name}} -o:minimal
+  odin build {{src}} -build-mode:exe -out:target/minimal/{{name}} -o:minimal -linker:lld
 
 # build size binary (size optimization)
 build-size:
   [ -d target/size ] || mkdir -p target/size
-  odin build {{src}} -out:target/size/{{name}} -o:size
+  odin build {{src}} -build-mode:exe -out:target/size/{{name}} -o:size -linker:lld
 
 # build speed binary (speed optimization)
 build-speed:
   [ -d target/speed ] || mkdir -p target/speed
-  odin build {{src}} -out:target/speed/{{name}} -o:speed
+  odin build {{src}} -build-mode:exe -out:target/speed/{{name}} -o:speed -linker:lld
 
 # build aggressive binary (aggressive optimization)
 build-aggressive:
   [ -d target/aggressive ] || mkdir -p target/aggressive
-  odin build {{src}} -out:target/aggressive/{{name}} -o:aggressive
+  odin build {{src}} -build-mode:exe -out:target/aggressive/{{name}} -o:aggressive -linker:lld
 
 # build profile binary (aggressive optimization + debug symbols for profiling)
 build-profile:
   [ -d target/profile ] || mkdir -p target/profile
-  odin build {{src}} -out:target/profile/{{name}} -o:aggressive -debug
+  odin build {{src}} -build-mode:exe -out:target/profile/{{name}} -o:aggressive -debug -linker:lld
 
 # build and run debug binary
 run-debug: build-debug
