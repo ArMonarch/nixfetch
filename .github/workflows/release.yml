@@ -30,7 +30,7 @@ jobs:
       - name: Create GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create $VERSION --draft --verify-tag --title "nixfetch v$VERSION"
+        run: gh release create $VERSION --draft --verify-tag --title "nixfetch $VERSION"
 
     outputs:
       version: ${{ env.VERSION }}
@@ -54,9 +54,6 @@ jobs:
       - uses: docker/setup-qemu-action@v3
 
       - uses: cachix/install-nix-action@v31
-        with:
-          extra_nix_config: |
-            extra-platforms = aarch64-linux
 
       - name: Build ${{ matrix.name }} binary
         run: nix build ${{ matrix.package }}
