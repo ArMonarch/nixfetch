@@ -1,8 +1,9 @@
 {
   lib,
+  just,
   stdenv,
-  autoPatchelfHook,
   odin-bin,
+  llvmPackages,
 }:
 stdenv.mkDerivation {
   pname = "nixfetch";
@@ -12,23 +13,25 @@ stdenv.mkDerivation {
     root = ../.;
     fileset = lib.fileset.unions [
       ./../src
+      ./../justfile
     ];
   };
 
   nativeBuildInputs = [
+    just
     odin-bin."dev-2026-03".latest
-    autoPatchelfHook
+    llvmPackages.bintools-unwrapped
   ];
 
   buildPhase = ''
     runHook preBuild
-    odin build src -out:nixfetch -o:aggressive
+    just build-aggressive
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    install -Dm755 nixfetch $out/bin/nixfetch
+    install -Dm755 ./target/aggressive/nixfetch $out/bin/nixfetch
     runHook postInstall
   '';
 
