@@ -13,13 +13,11 @@ stdenv.mkDerivation {
     root = ../.;
     fileset = lib.fileset.unions [
       ./../src
-      ./../justfile
     ];
   };
 
   nativeBuildInputs = [
-    just
-    odin-bin."dev-2026-03".latest
+    odin-bin."dev-2026-07a"
     llvmPackages.bintools-unwrapped
   ];
 
