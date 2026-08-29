@@ -1,18 +1,18 @@
 {
   lib,
-  just,
   stdenv,
   odin-bin,
   llvmPackages,
 }:
 stdenv.mkDerivation {
   pname = "nixfetch";
-  version = "0.4.0";
+  version = "0.4.11";
 
   src = lib.fileset.toSource {
     root = ../.;
     fileset = lib.fileset.unions [
       ./../src
+      ./../build.odin
     ];
   };
 
@@ -23,7 +23,7 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    just build-aggressive
+    odin run build.odin -file -- build -o:aggressive
     runHook postBuild
   '';
 

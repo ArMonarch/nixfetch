@@ -146,6 +146,7 @@ cmd_build :: proc(cmd: ^Command, parse: ^Parse) {
 	src := SRC
 	if parse.positional != "" do src = parse.positional
 	optimization := parse.values["o"] or_else "debug"
+	linker := parse.values["linker"] or_else LINKER
 	out := fmt.tprintf("%s/%s", TARGET, optimization)
 	if dir_err := create_dir(out); dir_err != nil {
 		fmt.eprintfln("could not create %s: %v", out, dir_err)
@@ -160,6 +161,7 @@ cmd_build :: proc(cmd: ^Command, parse: ^Parse) {
 	if optimization == "size" do append(&command, "-disable-assert", "-no-bounds-check")
 	if optimization == "aggressive" do append(&command, "-disable-assert", "-no-bounds-check")
 	when ODIN_OS == .Darwin do append(&command, "-use-single-module")
+	append(&command, fmt.tprintf("-linker:%s", linker))
 	append(&command, fmt.tprintf("-out:%s/%s", out, NAME))
 	run(..command[:])
 }
@@ -171,6 +173,7 @@ cmd_run :: proc(cmd: ^Command, parse: ^Parse) {
 	src := SRC
 	if parse.positional != "" do src = parse.positional
 	optimization := parse.values["o"] or_else "debug"
+	linker := parse.values["linker"] or_else LINKER
 
 	command := make([dynamic]string, 0, 8, context.allocator)
 	append(&command, "odin", "run", src)
@@ -180,6 +183,7 @@ cmd_run :: proc(cmd: ^Command, parse: ^Parse) {
 	if optimization == "size" do append(&command, "-disable-assert", "-no-bounds-check")
 	if optimization == "aggressive" do append(&command, "-disable-assert", "-no-bounds-check")
 	when ODIN_OS == .Darwin do append(&command, "-use-single-module")
+	append(&command, fmt.tprintf("-linker:%s", linker))
 	run(..command[:])
 }
 
@@ -220,6 +224,12 @@ commands :: proc() -> []Command {
 			arg = "<level>",
 			allowed = []string{"none", "minimal", "size", "speed", "aggressive"},
 			help = "Sets the optimization mode for compilation.",
+		},
+		{
+			name = "linker",
+			kind = .String,
+			arg = "<name>",
+			help = "Sets the linker to use, defaulting to '" + LINKER + "'.",
 		},
 	}
 
