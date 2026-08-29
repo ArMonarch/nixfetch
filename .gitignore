@@ -1,2 +1,12 @@
-# ignore the target folder as it contains the build binary
-target/
+# build script output
+/target
+
+# raddbg logs
+*.raddbg.log
+raddbg.log
+
+# `odin run build.odin -file` drops its own executable here
+/build
+/build.bin
+/build.dSYM/
+
