@@ -43,7 +43,6 @@
             odin-bin."dev-2026-07a"
             ols-bin."dev-2026-06"
             lld
-            just
           ];
           shellHook = ''
             echo "Initialized Odin Development Environment"

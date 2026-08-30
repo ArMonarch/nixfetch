@@ -1,0 +1,353 @@
+// raddbg 0.9.29 project file
+
+theme_color:
+{
+  tags: background
+  value: 0x191724ff
+}
+theme_color:
+{
+  tags: "alt background"
+  value: 0x1f1d2eff
+}
+theme_color:
+{
+  tags: "pop background"
+  value: 0x57473bff
+}
+theme_color:
+{
+  tags: "fresh background"
+  value: 0x4e404aff
+}
+theme_color:
+{
+  tags: "match background"
+  value: 0x3a4551ff
+}
+theme_color:
+{
+  tags: border
+  value: 0x403d52ff
+}
+theme_color:
+{
+  tags: text
+  value: 0xe0def4ff
+}
+theme_color:
+{
+  tags: "weak text"
+  value: 0x908caaff
+}
+theme_color:
+{
+  tags: "good text"
+  value: 0x95b1acff
+}
+theme_color:
+{
+  tags: "neutral text"
+  value: 0x9ccfd8ff
+}
+theme_color:
+{
+  tags: "bad text"
+  value: 0xeb6f92ff
+}
+theme_color:
+{
+  tags: hover
+  value: 0x9ccfd8ff
+}
+theme_color:
+{
+  tags: "focus overlay"
+  value: 0xc4a7e714
+}
+theme_color:
+{
+  tags: "focus border"
+  value: 0xc4a7e7ff
+}
+theme_color:
+{
+  tags: cursor
+  value: 0xebbcbaff
+}
+theme_color:
+{
+  tags: selection
+  value: 0x9ccfd824
+}
+theme_color:
+{
+  tags: "inactive background"
+  value: 0x16
+}
+theme_color:
+{
+  tags: drop_shadow
+  value: 0x0000007f
+}
+theme_color:
+{
+  tags: "good_pop background"
+  value: 0x2c443fff
+}
+theme_color:
+{
+  tags: "good_pop border"
+  value: 0x547871ff
+}
+theme_color:
+{
+  tags: "good_pop hover"
+  value: 0xcad8d5ff
+}
+theme_color:
+{
+  tags: "good_pop weak text"
+  value: 0xcad8d5ff
+}
+theme_color:
+{
+  tags: "bad_pop background"
+  value: 0x592635ff
+}
+theme_color:
+{
+  tags: "bad_pop hover"
+  value: 0xf5a3baff
+}
+theme_color:
+{
+  tags: code_default
+  value: 0xe0def4ff
+}
+theme_color:
+{
+  tags: code_symbol
+  value: 0xebbcbaff
+}
+theme_color:
+{
+  tags: code_type
+  value: 0x9ccfd8ff
+}
+theme_color:
+{
+  tags: code_local
+  value: 0xc4a7e7ff
+}
+theme_color:
+{
+  tags: code_register
+  value: 0x95b1acff
+}
+theme_color:
+{
+  tags: code_keyword
+  value: 0x31748fff
+}
+theme_color:
+{
+  tags: code_delimiter_or_operator
+  value: 0x908caaff
+}
+theme_color:
+{
+  tags: code_numeric
+  value: 0xf6c177ff
+}
+theme_color:
+{
+  tags: code_numeric_alt_digit_group
+  value: 0x9e7d56ff
+}
+theme_color:
+{
+  tags: code_string
+  value: 0xf6c177ff
+}
+theme_color:
+{
+  tags: code_meta
+  value: 0xeb6f92ff
+}
+theme_color:
+{
+  tags: code_comment
+  value: 0x6e6a86ff
+}
+theme_color:
+{
+  tags: line_info_0
+  value: 0x472a3cff
+}
+theme_color:
+{
+  tags: line_info_1
+  value: 0x4a3c36ff
+}
+theme_color:
+{
+  tags: line_info_2
+  value: 0x363f4cff
+}
+theme_color:
+{
+  tags: line_info_3
+  value: 0x3f374fff
+}
+theme_color:
+{
+  tags: line_info_4
+  value: 0x472a3cff
+}
+theme_color:
+{
+  tags: line_info_5
+  value: 0x4a3c36ff
+}
+theme_color:
+{
+  tags: line_info_6
+  value: 0x363f4cff
+}
+theme_color:
+{
+  tags: line_info_7
+  value: 0x3f374fff
+}
+theme_color:
+{
+  tags: thread_0
+  value: 0xf6c177ff
+}
+theme_color:
+{
+  tags: thread_1
+  value: 0x9ccfd8ff
+}
+theme_color:
+{
+  tags: thread_unwound
+  value: 0x908caaff
+}
+theme_color:
+{
+  tags: thread_error
+  value: 0xcb4d71ff
+}
+theme_color:
+{
+  tags: breakpoint
+  value: 0xeb6f92ff
+}
+theme_color:
+{
+  tags: "floating background"
+  value: 0x1f1d2eaf
+}
+theme_color:
+{
+  tags: "floating background alt"
+  value: 0x0000005f
+}
+theme_color:
+{
+  tags: "floating background fresh"
+  value: 0x4e404a5f
+}
+theme_color:
+{
+  tags: "floating border"
+  value: 0x908caa2f
+}
+theme_color:
+{
+  tags: "floating scroll_bar background"
+  value: 0x403d525f
+}
+theme_color:
+{
+  tags: "floating scroll_bar border"
+  value: 0x524f675f
+}
+theme_color:
+{
+  tags: "scroll_bar background"
+  value: 0x26233aff
+}
+theme_color:
+{
+  tags: "scroll_bar border"
+  value: 0x403d52ff
+}
+theme_color:
+{
+  tags: "implicit background"
+  value: 0x00000000
+}
+theme_color:
+{
+  tags: "implicit border"
+  value: 0x00000000
+}
+theme_color:
+{
+  tags: "hollow background"
+  value: 0x00000000
+}
+theme_color:
+{
+  tags: "hollow border"
+  value: 0xe0def41f
+}
+theme_color:
+{
+  tags: "tab background"
+  value: 0x26233aff
+}
+theme_color:
+{
+  tags: "tab border"
+  value: 0xc4a7e7ff
+}
+theme_color:
+{
+  tags: "tab inactive background"
+  value: 0
+}
+theme_color:
+{
+  tags: "tab inactive border"
+  value: 0x403d52ff
+}
+theme_color:
+{
+  tags: "tab auto background"
+  value: 0x2b4760ff
+}
+theme_color:
+{
+  tags: "tab auto inactive background"
+  value: 0x2b476039
+}
+theme_color:
+{
+  tags: "drop_site background"
+  value: 0xc4a7e70a
+}
+theme_color:
+{
+  tags: "drop_site border"
+  value: 0xc4a7e71f
+}
+target:
+{
+  executable: "target/debug/nixfetch"
+  working_directory: "../nixfetch"
+  enabled: 1
+}

@@ -1,8 +1,11 @@
 package nixfetch
 
+import "base:runtime"
 import "core:encoding/base64"
 import "core:fmt"
 import "core:os"
+import "core:slice"
+import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
 import "core:terminal/ansi"
@@ -26,20 +29,19 @@ get_username_and_hostname :: proc(
 	uts_name: ^linux.UTS_Name,
 	allocator := context.allocator,
 ) -> string {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
 	username: string
 	found: bool
-	if username, found = os.lookup_env("USER", allocator); found != true {
+	if username, found = os.lookup_env("USER", context.temp_allocator); found != true {
 		username = strings.clone("unknown")
 	}
-	defer delete(username)
-
-	hostname := strings.clone_from_cstring(cstring(&uts_name.nodename[0]))
-	defer delete(hostname)
+	hostname := strings.clone_from_cstring(cstring(&uts_name.nodename[0]), context.temp_allocator)
 
 	// capacity := len(user) + len(hostname) + (~)1 + (@)1
 	//             (FG_YELLOW)5 + (FG_RED)5 + (FG_GREEN)5 + (FG_RESET)4
 	cap := len(username) + len(hostname) + 1 + 1 + 5 + 5 + 5 + 4
-	result := strings.builder_make(len = 0, cap = cap)
+	result := strings.builder_make(len = 0, cap = cap, allocator = allocator)
 
 	// build colored "user@hostname~" output
 	strings.write_string(&result, FG_YELLOW)
@@ -336,53 +338,418 @@ get_colored_dots :: proc() -> string {
 	return strings.to_string(result)
 }
 
+// reads the value out of the first "<key><sep> <value>" line of a /proc or /sys style file
+parse_field :: proc(content: string, key: string, sep: byte) -> string {
+	idx := strings.index(content, key)
+	if idx == -1 {
+		return ""
+	}
+
+	rest := content[idx + len(key):]
+	line_end := strings.index_byte(rest, '\n')
+	if line_end == -1 {
+		line_end = len(rest)
+	}
+
+	// the separator has to sit on the same line as the key
+	sep_idx := strings.index_byte(rest[:line_end], sep)
+	if sep_idx == -1 {
+		return ""
+	}
+
+	return strings.trim_space(rest[sep_idx + 1:line_end])
+}
+
+// reads a sysfs file that holds nothing but a single base 10 integer
+read_int_file :: proc(path: string, allocator := context.allocator) -> (value: int, ok: bool) {
+	data, err := os.read_entire_file(path, allocator)
+	if err != nil {
+		return 0, false
+	}
+	defer delete(data)
+
+	return strconv.parse_int(strings.trim_space(string(data)), 10)
+}
+
+// writes the cpu model name with the vendor noise ("(R)", "(TM)") and the baked in
+// base frequency stripped out, the max frequency is reported separately
+write_cpu_model :: proc(builder: ^strings.Builder, model: string) {
+	NOISE :: [?]string{"(R)", "(TM)", "(r)", "(tm)"}
+
+	name := model
+	if at := strings.index(name, " @ "); at != -1 {
+		name = name[:at]
+	}
+
+	next: for i := 0; i < len(name); {
+		for noise in NOISE {
+			if strings.has_prefix(name[i:], noise) {
+				i += len(noise)
+				continue next
+			}
+		}
+
+		strings.write_byte(builder, name[i])
+		i += 1
+	}
+}
+
+// returns "model (threads) @ max GHz" from /proc/cpuinfo and the cpufreq sysfs entries
+get_cpu_info :: proc(allocator := context.allocator) -> string {
+	data, err := os.read_entire_file("/proc/cpuinfo", allocator)
+	if err != nil {
+		return strings.clone("unknown")
+	}
+	defer delete(data)
+	content := string(data)
+
+	model := parse_field(content, "model name", ':')
+	if model == "" {
+		return strings.clone("unknown")
+	}
+
+	// every logical cpu gets its own "processor" record
+	threads := strings.count(content, "\nprocessor")
+	if strings.has_prefix(content, "processor") {
+		threads += 1
+	}
+
+	result := strings.builder_make(0, 128)
+	write_cpu_model(&result, model)
+
+	if threads > 0 {
+		fmt.sbprintf(&result, " (%d)", threads)
+	}
+
+	// cpuinfo_max_freq is the hardware limit in kHz, fall back to what cpu0 is clocked at now
+	if khz, ok := read_int_file(
+		"/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
+		allocator,
+	); ok {
+		fmt.sbprintf(&result, " @ %.2f GHz", f64(khz) / (1000 * 1000))
+	} else if mhz, parsed := strconv.parse_f64(parse_field(content, "cpu MHz", ':')); parsed {
+		fmt.sbprintf(&result, " @ %.2f GHz", mhz / 1000)
+	}
+
+	return strings.to_string(result)
+}
+
+// paths shipping the pci id database, NIXFETCH_PCI_IDS overrides the lookup
+@(rodata)
+PCI_IDS_PATHS := [?]string {
+	"/usr/share/hwdata/pci.ids",
+	"/usr/share/misc/pci.ids",
+	"/run/current-system/sw/share/hwdata/pci.ids",
+	"/var/lib/pciutils/pci.ids",
+}
+
+// vendors we can still name when no pci id database is installed
+@(rodata)
+PCI_VENDORS := [?]struct {
+	id:   string,
+	name: string,
+} {
+	{"10de", "NVIDIA"},
+	{"8086", "Intel"},
+	{"1002", "AMD"},
+	{"1022", "AMD"},
+	{"15ad", "VMware"},
+	{"1af4", "Red Hat"},
+	{"1a03", "ASPEED"},
+}
+
+// returns the contents of the first pci id database found, or "" when none is installed
+read_pci_ids :: proc(allocator := context.allocator) -> string {
+	if path, found := os.lookup_env("NIXFETCH_PCI_IDS", allocator); found {
+		defer delete(path)
+		if data, err := os.read_entire_file(path, allocator); err == nil {
+			return string(data)
+		}
+	}
+
+	for path in PCI_IDS_PATHS {
+		if data, err := os.read_entire_file(path, allocator); err == nil {
+			return string(data)
+		}
+	}
+
+	return ""
+}
+
+// resolves a pci id pair against an already loaded pci id database.
+// both returned strings alias `db` and stay valid only as long as it does.
+pci_ids_lookup :: proc(
+	db: string,
+	vendor_id: string,
+	device_id: string,
+) -> (
+	vendor, device: string,
+) {
+	rest := db
+	in_vendor := false
+
+	for len(rest) > 0 {
+		line: string
+		if end := strings.index_byte(rest, '\n'); end != -1 {
+			line, rest = rest[:end], rest[end + 1:]
+		} else {
+			line, rest = rest, ""
+		}
+
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+
+		// vendor records sit at column zero, their devices are indented by a single tab
+		if line[0] != '\t' {
+			// walked past the whole vendor block without matching the device
+			if in_vendor {
+				return
+			}
+
+			if strings.has_prefix(line, vendor_id) {
+				in_vendor = true
+				vendor = strings.trim_space(line[len(vendor_id):])
+			}
+			continue
+		}
+
+		// a double tab marks a subsystem record, not a device
+		if !in_vendor || strings.has_prefix(line, "\t\t") {
+			continue
+		}
+
+		if strings.has_prefix(line[1:], device_id) {
+			device = strings.trim_space(line[1 + len(device_id):])
+			return
+		}
+	}
+
+	return
+}
+
+// the database spells vendors out in full, shorten the common ones to fit a fetch line
+shorten_pci_vendor :: proc(vendor: string) -> string {
+	switch {
+	case strings.has_prefix(vendor, "NVIDIA"):
+		return "NVIDIA"
+	case strings.has_prefix(vendor, "Intel"):
+		return "Intel"
+	case strings.has_prefix(vendor, "Advanced Micro Devices"):
+		return "AMD"
+	}
+
+	return vendor
+}
+
+// the nvidia driver publishes the marketing name that the pci id alone cannot give us
+get_nvidia_model :: proc(pci_slot: string, allocator := context.allocator) -> string {
+	path := strings.concatenate({"/proc/driver/nvidia/gpus/", pci_slot, "/information"}, allocator)
+	defer delete(path)
+
+	data, err := os.read_entire_file(path, allocator)
+	if err != nil {
+		return ""
+	}
+	defer delete(data)
+
+	model := parse_field(string(data), "Model", ':')
+	return model == "" ? "" : strings.clone(model, allocator)
+}
+
+// returns every pci gpu found under /sys/class/drm, comma separated
+get_gpu_info :: proc(allocator := context.allocator) -> string {
+	cards, err := os.read_directory_by_path("/sys/class/drm", -1, allocator)
+	if err != nil {
+		return strings.clone("unknown")
+	}
+	defer os.file_info_slice_delete(cards, allocator)
+
+	// readdir order is not stable, sort so the cards always print in the same order
+	slice.sort_by(cards, proc(a, b: os.File_Info) -> bool {
+		return a.name < b.name
+	})
+
+	pci_ids := read_pci_ids(allocator)
+	defer delete(pci_ids, allocator)
+
+	result := strings.builder_make(0, 128)
+
+	for card in cards {
+		// "card0" is the device itself, "card0-HDMI-A-1" is one of its connectors
+		if !strings.has_prefix(card.name, "card") || strings.contains(card.name, "-") {
+			continue
+		}
+
+		uevent_path := strings.concatenate(
+			{"/sys/class/drm/", card.name, "/device/uevent"},
+			allocator,
+		)
+		defer delete(uevent_path)
+
+		data, read_err := os.read_entire_file(uevent_path, allocator)
+		if read_err != nil {
+			continue
+		}
+		defer delete(data)
+
+		// only pci gpus carry a PCI_ID, formatted as "VVVV:DDDD"
+		uevent := string(data)
+		pci_id := parse_field(uevent, "PCI_ID", '=')
+		if len(pci_id) != 9 {
+			continue
+		}
+
+		ids := strings.to_lower(pci_id, allocator)
+		defer delete(ids)
+		vendor_id, device_id := ids[:4], ids[5:]
+
+		if len(result.buf) != 0 {
+			strings.write_string(&result, ", ")
+		}
+
+		// the proprietary driver knows the name of its own card
+		if parse_field(uevent, "DRIVER", '=') == "nvidia" {
+			slot := parse_field(uevent, "PCI_SLOT_NAME", '=')
+			if model := get_nvidia_model(slot, allocator); model != "" {
+				defer delete(model)
+				strings.write_string(&result, model)
+				continue
+			}
+		}
+
+		vendor, device := pci_ids_lookup(pci_ids, vendor_id, device_id)
+		if device != "" {
+			strings.write_string(&result, shorten_pci_vendor(vendor))
+			strings.write_rune(&result, ' ')
+			strings.write_string(&result, device)
+			continue
+		}
+
+		// without a database all we can name is the vendor, so print the raw ids alongside
+		for known in PCI_VENDORS {
+			if known.id == vendor_id {
+				strings.write_string(&result, known.name)
+				strings.write_rune(&result, ' ')
+				break
+			}
+		}
+		fmt.sbprintf(&result, "[%s]", ids)
+	}
+
+	if len(result.buf) == 0 {
+		strings.builder_destroy(&result)
+		return strings.clone("unknown")
+	}
+
+	return strings.to_string(result)
+}
+
+// returns the filesystem type mounted at "/" according to /proc/mounts
+get_root_fstype :: proc(allocator := context.allocator) -> string {
+	data, err := os.read_entire_file("/proc/mounts", allocator)
+	if err != nil {
+		return ""
+	}
+	defer delete(data)
+
+	// every line reads "<device> <mountpoint> <type> <options> <dump> <pass>"
+	content := string(data)
+	for line in strings.split_lines_iterator(&content) {
+		device_end := strings.index_byte(line, ' ')
+		if device_end == -1 {
+			continue
+		}
+
+		rest := line[device_end + 1:]
+		mount_end := strings.index_byte(rest, ' ')
+		if mount_end == -1 || rest[:mount_end] != "/" {
+			continue
+		}
+
+		rest = rest[mount_end + 1:]
+		type_end := strings.index_byte(rest, ' ')
+		if type_end == -1 {
+			type_end = len(rest)
+		}
+
+		return strings.clone(rest[:type_end], allocator)
+	}
+
+	return ""
+}
+
+// returns "used GiB / total GiB (X%) - fstype" for the root filesystem
+get_filesystem_info :: proc(allocator := context.allocator) -> string {
+	stat: linux.Stat_FS
+	if err := linux.statfs("/", &stat); err != .NONE {
+		return strings.clone("unknown")
+	}
+
+	GIB :: f64(1024 * 1024 * 1024)
+	total_gib := f64(stat.blocks) * f64(stat.bsize) / GIB
+	used_gib := f64(stat.blocks - stat.bfree) * f64(stat.bsize) / GIB
+	percentage_use := total_gib > 0 ? (used_gib / total_gib) * 100 : 0
+
+	result := strings.builder_make(0, 128)
+	fmt.sbprintf(&result, "%.2f GiB / %.2f GiB (%.0f%%)", used_gib, total_gib, percentage_use)
+
+	// the magic number in Stat_FS cannot tell ext2/3/4 apart, /proc/mounts names the type outright
+	if fstype := get_root_fstype(allocator); fstype != "" {
+		defer delete(fstype)
+		fmt.sbprintf(&result, " - %s", fstype)
+	}
+
+	return strings.to_string(result)
+}
+
 KeyVal :: struct {
 	label: string,
 	value: ^string,
 }
 
-ffields_fmts :: proc(target: ^[dynamic]KeyVal, ffields: ^FetchFields) {
+sysinfo_fmts :: proc(target: ^[dynamic]KeyVal, sysinfo: ^SystemInfo) {
 	append(
 		target,
-		KeyVal{FG_BLUE + "OS" + FG_RESET, &ffields.os_name},
-		KeyVal{FG_BLUE + "Host" + FG_RESET, &ffields.host_info},
-		KeyVal{FG_BLUE + "Kernel" + FG_RESET, &ffields.kernel_info},
-		KeyVal{FG_BLUE + "Shell" + FG_RESET, &ffields.shell_info},
-		KeyVal{FG_BLUE + "Desktop" + FG_RESET, &ffields.desktop_info},
-		KeyVal{FG_BLUE + "Memory" + FG_RESET, &ffields.memory_info},
-		KeyVal{FG_BLUE + "Swap" + FG_RESET, &ffields.swap_info},
-		KeyVal{FG_BLUE + "Terminal" + FG_RESET, &ffields.terminal_info},
-		KeyVal{FG_BLUE + "Uptime" + FG_RESET, &ffields.uptime},
-		KeyVal{FG_BLUE + "Colors" + FG_RESET, &ffields.colors},
+		KeyVal{FG_BLUE + "OS" + FG_RESET, &sysinfo.os_name},
+		KeyVal{FG_BLUE + "Host" + FG_RESET, &sysinfo.host_info},
+		KeyVal{FG_BLUE + "Kernel" + FG_RESET, &sysinfo.kernel_info},
+		KeyVal{FG_BLUE + "Shell" + FG_RESET, &sysinfo.shell_info},
+		KeyVal{FG_BLUE + "Desktop" + FG_RESET, &sysinfo.desktop_info},
+		KeyVal{FG_BLUE + "CPU" + FG_RESET, &sysinfo.cpu_info},
+		KeyVal{FG_BLUE + "GPU" + FG_RESET, &sysinfo.gpu_info},
+		KeyVal{FG_BLUE + "Memory" + FG_RESET, &sysinfo.memory_info},
+		KeyVal{FG_BLUE + "Swap" + FG_RESET, &sysinfo.swap_info},
+		KeyVal{FG_BLUE + "Disk" + FG_RESET, &sysinfo.filesystem_info},
+		KeyVal{FG_BLUE + "Terminal" + FG_RESET, &sysinfo.terminal_info},
+		KeyVal{FG_BLUE + "Uptime" + FG_RESET, &sysinfo.uptime},
+		KeyVal{FG_BLUE + "Colors" + FG_RESET, &sysinfo.colors},
 	)
 
 	// fmt.sbprintf(&builder, "%s%-8s %s : %s", FG_BLUE, f.label, FG_RESET, f.value)
 }
 
 // prints all fetch fields formatted inside the NixOS logo
-pretty_print_fetch_fields_with_logo :: proc(ffields: ^FetchFields) {
+pretty_print_sysinfo_with_logo :: proc(sysinfo: ^SystemInfo) {
 	buffer := strings.builder_make(0, 4096)
 	defer strings.builder_destroy(&buffer)
-	nix_logo := nix_logo_black_white()
-	defer delete(nix_logo)
-
 
 	// build key-value pairs from fetch fields for side-by-side printing with the logo
 	fetches := make([dynamic]KeyVal)
 	defer delete(fetches)
-	ffields_fmts(&fetches, ffields)
-	min_len := min(len(nix_logo), len(fetches))
+	sysinfo_fmts(&fetches, sysinfo)
+	min_len := min(len(NIX_LOGO_BLACK_WHITE), len(fetches))
 
 	// Print logo lines side by side with fetch fields
 	for index in 0 ..< min_len {
-		strings.write_string(&buffer, nix_logo[index])
+		strings.write_string(&buffer, NIX_LOGO_BLACK_WHITE[index])
 		fmt.sbprintf(&buffer, "%-18s : %s", fetches[index].label, fetches[index].value^)
 		strings.write_string(&buffer, "\n")
 	}
 
 	// Print remaining logo lines if the logo is taller than the fetch fields
-	for index in min_len ..< len(nix_logo) {
-		strings.write_string(&buffer, nix_logo[index])
+	for index in min_len ..< len(NIX_LOGO_BLACK_WHITE) {
+		strings.write_string(&buffer, NIX_LOGO_BLACK_WHITE[index])
 		strings.write_string(&buffer, "\n")
 	}
 
@@ -400,16 +767,14 @@ pretty_print_fetch_fields_with_logo :: proc(ffields: ^FetchFields) {
 
 // prints fetch fields with a custom image using the kitty graphics protocol
 // falls back to the logo variant if the image path is invalid
-pretty_print_fetch_fields_with_image :: proc(ffields: ^FetchFields, image_path: string) {
+pretty_print_sysinfo_with_image :: proc(sysinfo: ^SystemInfo, image_path: string) {
 	if !os.is_file(image_path) {
-		fmt.println("Error: NIXFETCH_IMAGE is not a valid file")
-		pretty_print(ffields)
+		fmt.eprintln("Error: NIXFETCH_IMAGE is not a valid file")
 		return
 	}
 
 	if !strings.has_suffix(image_path, ".png") {
-		fmt.println("Error: NIXFETCH_IMAGE must be a png image")
-		pretty_print(ffields)
+		fmt.eprintln("Error: NIXFETCH_IMAGE must be a png image")
 		return
 	}
 
@@ -422,7 +787,7 @@ pretty_print_fetch_fields_with_image :: proc(ffields: ^FetchFields, image_path: 
 
 	fetches := make([dynamic]KeyVal)
 	defer delete(fetches)
-	ffields_fmts(&fetches, ffields)
+	sysinfo_fmts(&fetches, sysinfo)
 
 	fmt.print("\n")
 	// print fetch fields first, padded left to leave space for the image
@@ -439,46 +804,51 @@ pretty_print_fetch_fields_with_image :: proc(ffields: ^FetchFields, image_path: 
 }
 
 // overloaded proc: dispatches to logo or image variant based on arguments
-pretty_print :: proc {
-	pretty_print_fetch_fields_with_logo,
-	pretty_print_fetch_fields_with_image,
+pretty_print_sysinfo :: proc {
+	pretty_print_sysinfo_with_logo,
+	pretty_print_sysinfo_with_image,
 }
 
-// populates a FetchFields struct by gathering all system info.
+// populates a SystemInfo struct by gathering all system info.
 // all string values are heap-allocated and must be freed via drop().
-new_ffields :: proc(ff: ^FetchFields, uts_name: ^linux.UTS_Name) {
-	ff^ = FetchFields {
-		user_info     = get_username_and_hostname(uts_name),
-		os_name       = get_osname(),
-		host_info     = get_host_info(),
-		kernel_info   = get_kernel_info(uts_name),
-		shell_info    = get_shell_info(),
-		desktop_info  = get_desktop_info(),
-		uptime        = get_uptime(),
-		memory_info   = get_memory_info(),
-		swap_info     = get_swap_info(),
-		terminal_info = get_terminal_info(),
-		colors        = get_colored_dots(),
+create_sysinfo :: proc(sysinfo: ^SystemInfo) {
+	// get hostname via uname syscall
+	uts_name: linux.UTS_Name
+	linux.uname(&uts_name)
+
+	sysinfo^ = SystemInfo {
+		user_info       = get_username_and_hostname(&uts_name),
+		os_name         = get_osname(),
+		host_info       = get_host_info(),
+		kernel_info     = get_kernel_info(&uts_name),
+		shell_info      = get_shell_info(),
+		desktop_info    = get_desktop_info(),
+		uptime          = get_uptime(),
+		// cpu_info        = get_cpu_info(),
+		// gpu_info        = get_gpu_info(),
+		memory_info     = get_memory_info(),
+		swap_info       = get_swap_info(),
+		filesystem_info = get_filesystem_info(),
+		terminal_info   = get_terminal_info(),
+		colors          = get_colored_dots(),
 	}
 }
 
-// frees all heap-allocated string values in a FetchFields struct.
-drop_ffields :: proc(fetch_fields: ^FetchFields) {
-	// delete all fetch_fields values
-	defer delete(fetch_fields.user_info)
-	defer delete(fetch_fields.os_name)
-	defer delete(fetch_fields.host_info)
-	defer delete(fetch_fields.kernel_info)
-	defer delete(fetch_fields.shell_info)
-	defer delete(fetch_fields.desktop_info)
-	defer delete(fetch_fields.memory_info)
-	defer delete(fetch_fields.swap_info)
-	defer delete(fetch_fields.terminal_info)
-	defer delete(fetch_fields.uptime)
-	defer delete(fetch_fields.colors)
-}
-
-// overloaded destructor: dispatches to the appropriate drop procedure.
-drop :: proc {
-	drop_ffields,
+// frees all heap-allocated string values in a SystemInfo struct.
+destroy_sysinfo :: proc(sysinfo: ^SystemInfo) {
+	// delete all sysinfo values
+	defer delete(sysinfo.user_info)
+	defer delete(sysinfo.os_name)
+	defer delete(sysinfo.host_info)
+	defer delete(sysinfo.kernel_info)
+	defer delete(sysinfo.shell_info)
+	defer delete(sysinfo.desktop_info)
+	defer delete(sysinfo.cpu_info)
+	defer delete(sysinfo.gpu_info)
+	defer delete(sysinfo.memory_info)
+	defer delete(sysinfo.swap_info)
+	defer delete(sysinfo.filesystem_info)
+	defer delete(sysinfo.terminal_info)
+	defer delete(sysinfo.uptime)
+	defer delete(sysinfo.colors)
 }
