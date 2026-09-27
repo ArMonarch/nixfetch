@@ -40,8 +40,8 @@
 
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            odin-bin."dev-2026-07a"
-            ols-bin."dev-2026-06"
+            odin-bin."dev-2026-09"
+            ols-bin."dev-2026-08"
             lld
           ];
           shellHook = ''
