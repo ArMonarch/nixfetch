@@ -76,7 +76,7 @@ Binaries are output to `target/<variant>/nixfetch`.
 src/
 ├── main.odin     # entry point, collects system info
 ├── lib.odin      # system info gathering functions
-└── format.odin   # NixOS logo definitions
+└── logo.odin     # NixOS logo definitions
 flake.nix         # Nix dev environment
 justfile          # build recipes
 ```
