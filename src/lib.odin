@@ -1,14 +1,14 @@
 package nixfetch
 
-// which layout to print, fixed at build time: -define:NIXFETCH_LAYOUT=glacier
-//   flurry  - icon, label, "¦", value, with a color palette row      (image 1)
-//   frost   - user@host, a dashed rule, "Label: value" lines         (image 2)
-//   glacier - fields grouped into titled boxes                       (image 3)
-//   icicle  - short upper-case labels, memory drawn as a bar         (image 4)
-LAYOUT :: #config(NIXFETCH_LAYOUT, "flurry")
+// which layout to print, fixed at build time: -define:NIXFETCH_LAYOUT=Glacier
+//   Flurry  - icon, label, ":", value, with a color palette row      (image 1)
+//   Frost   - user@host, a dashed rule, "Label: value" lines         (image 2)
+//   Glacier - fields grouped into titled boxes                       (image 3)
+//   Icicle  - short upper-case labels, memory drawn as a bar         (image 4)
+LAYOUT :: #config(NIXFETCH_LAYOUT, "Flurry")
 #assert(
-	LAYOUT == "flurry" || LAYOUT == "frost" || LAYOUT == "glacier" || LAYOUT == "icicle",
-	"NIXFETCH_LAYOUT must be one of flurry, frost, glacier or icicle",
+	LAYOUT == "Flurry" || LAYOUT == "Frost" || LAYOUT == "Glacier" || LAYOUT == "Icicle",
+	"NIXFETCH_LAYOUT must be one of Flurry, Frost, Glacier or Icicle",
 )
 
 // print "<icon> <label> : <value>" when true, "<label> : <value>" when false: -define:NIXFETCH_ICONS=false
