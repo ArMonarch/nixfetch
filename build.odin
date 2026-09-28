@@ -171,6 +171,11 @@ compiler_command :: proc(verb: string, p: ^Parse) -> [dynamic]string {
 	}
 	when ODIN_OS == .Darwin do append(&command, "-use-single-module")
 	append(&command, fmt.tprintf("-linker:%s", linker))
+
+	// nixfetch's own compile-time settings, see the #config values in src/lib.odin
+	if layout, ok := p.values["layout"]; ok do append(&command, fmt.tprintf("-define:NIXFETCH_LAYOUT=%s", layout))
+	if icons, ok := p.values["icons"]; ok do append(&command, fmt.tprintf("-define:NIXFETCH_ICONS=%s", icons))
+	if pci_ids, ok := p.values["pci-ids"]; ok do append(&command, fmt.tprintf("-define:NIXFETCH_PCI_IDS=%s", pci_ids))
 	return command
 }
 
@@ -188,6 +193,23 @@ commands :: proc() -> []Command {
 			name = "linker",
 			arg = "<name>",
 			help = "Sets the linker to use, defaulting to '" + LINKER + "'.",
+		},
+		{
+			name = "layout",
+			arg = "<name>",
+			allowed = []string{"Flurry", "Frost", "Glacier", "Icicle"},
+			help = "Sets the layout nixfetch prints, defaulting to Flurry.",
+		},
+		{
+			name = "icons",
+			arg = "<bool>",
+			allowed = []string{"true", "false"},
+			help = "Prints a nerd font icon before each label, defaulting to true.",
+		},
+		{
+			name = "pci-ids",
+			arg = "<path>",
+			help = "Bakes in the pci.ids database used to name gpus.",
 		},
 	}
 

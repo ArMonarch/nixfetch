@@ -3,6 +3,10 @@
   stdenv,
   odin-bin,
   llvmPackages,
+  hwdata,
+  # compile-time settings, e.g. nixfetch.override { layout = "Glacier"; }
+  layout ? "Flurry",
+  icons ? true,
 }:
 stdenv.mkDerivation {
   pname = "nixfetch";
@@ -17,13 +21,16 @@ stdenv.mkDerivation {
   };
 
   nativeBuildInputs = [
-    odin-bin."dev-2026-07a"
+    odin-bin."dev-2026-09"
     llvmPackages.bintools-unwrapped
   ];
 
   buildPhase = ''
     runHook preBuild
-    odin run build.odin -file -- build -o:aggressive
+    odin run build.odin -file -- build -o:aggressive \
+      -layout:${layout} \
+      -icons:${lib.boolToString icons} \
+      -pci-ids:${hwdata}/share/hwdata/pci.ids
     runHook postBuild
   '';
 
