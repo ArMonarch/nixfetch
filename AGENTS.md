@@ -7,8 +7,12 @@ implement each change as guided, and ask when direction is unclear.
 
 ## Layout
 
-`src/` is the program: `main.odin` collects and prints, `lib.odin` gathers
-each field, `logo.odin` holds the logos. `build.odin` is the build system
+`src/` is the program: `main.odin` sets up the arena and writes the output,
+`lib.odin` holds the compile-time config, icons, `System` and a collector per
+field, `layout.odin` fills and lays out each layout beside the logo or image,
+`logo.odin` holds the logos. Every allocation comes from main's one arena, so
+collectors use raw syscalls rather than `core:os`, which allocates outside it.
+`build.odin` is the build system
 (`odin run build.odin -file -- build|run|clean`), output under `target/`.
 `nix/` and `flake.nix` package it; `.github/workflows/release.yml` builds
 releases on `vX.Y.Z` tags.
