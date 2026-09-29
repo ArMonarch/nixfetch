@@ -3,10 +3,9 @@
 target:
 {
   executable: "target/debug/nixfetch"
-  working_directory: "."
+  working_directory: "../nixfetch"
   enabled: 1
 }
-
 theme_color:
 {
   tags: background
