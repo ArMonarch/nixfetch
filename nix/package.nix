@@ -3,6 +3,9 @@
   stdenv,
   odin-bin,
   llvmPackages,
+  glibc,
+  # link libc into the binary, so it runs on any Linux and not just NixOS
+  static ? false,
 }:
 stdenv.mkDerivation {
   pname = "nixfetch";
@@ -11,8 +14,8 @@ stdenv.mkDerivation {
   src = lib.fileset.toSource {
     root = ../.;
     fileset = lib.fileset.unions [
-      ./../src
-      ./../build.odin
+      ../src
+      ../build.odin
     ];
   };
 
@@ -21,9 +24,12 @@ stdenv.mkDerivation {
     llvmPackages.bintools-unwrapped
   ];
 
+  buildInputs = lib.optional static glibc.static;
+
   buildPhase = ''
     runHook preBuild
-    odin run build.odin -file -- build -o:aggressive
+    # with glibc.static on the search path the build script finds libc.a too, so link it statically as well
+    odin run build.odin -file ${lib.optionalString static "-extra-linker-flags:-static"} -- build -o:aggressive -link:${if static then "static" else "dynamic"}
     runHook postBuild
   '';
 

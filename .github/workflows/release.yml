@@ -14,7 +14,8 @@ jobs:
   # Build every target first. Each one is built natively on a runner of its own
   # architecture, so no QEMU emulation is involved. Nothing is published until
   # all of them succeed, so a broken build never leaves a stray draft release
-  # behind.
+  # behind. The static package links libc in, so the binaries run on any Linux
+  # of their architecture, not only NixOS.
   build-release:
     name: build-release (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
@@ -24,10 +25,10 @@ jobs:
         include:
           - name: x86_64-linux
             runner: ubuntu-latest
-            package: .#packages.x86_64-linux.default
+            package: .#packages.x86_64-linux.static
           - name: aarch64-linux
             runner: ubuntu-24.04-arm
-            package: .#packages.aarch64-linux.default
+            package: .#packages.aarch64-linux.static
 
     steps:
       - uses: actions/checkout@v4

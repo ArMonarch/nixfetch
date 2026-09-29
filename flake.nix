@@ -56,6 +56,7 @@
         };
 
         packages.default = pkgs.callPackage ./nix/package.nix {};
+        packages.static = pkgs.callPackage ./nix/package.nix {static = true;};
       };
     };
 }

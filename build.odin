@@ -157,6 +157,7 @@ compiler_command :: proc(verb: string, p: ^Parse) -> [dynamic]string {
 	src := p.positional if p.positional != "" else SRC
 	optimization := p.values["o"] or_else "debug"
 	linker := p.values["linker"] or_else LINKER
+	link := p.values["link"] or_else "dynamic"
 
 	command := make([dynamic]string, context.temp_allocator)
 	append(&command, "odin", verb, src)
@@ -171,6 +172,9 @@ compiler_command :: proc(verb: string, p: ^Parse) -> [dynamic]string {
 	}
 	when ODIN_OS == .Darwin do append(&command, "-use-single-module")
 	append(&command, fmt.tprintf("-linker:%s", linker))
+	// Static pulls libc into the binary, so it runs on any Linux of its architecture, not
+	// only on systems with the glibc it was built against.
+	if link == "static" do append(&command, "-extra-linker-flags:-static")
 	return command
 }
 
@@ -188,6 +192,12 @@ commands :: proc() -> []Command {
 			name = "linker",
 			arg = "<name>",
 			help = "Sets the linker to use, defaulting to '" + LINKER + "'.",
+		},
+		{
+			name = "link",
+			arg = "<mode>",
+			allowed = []string{"dynamic", "static"},
+			help = "Links libc dynamically or statically, defaulting to dynamic.",
 		},
 	}
 
