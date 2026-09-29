@@ -156,7 +156,6 @@ cmd_clean :: proc(p: ^Parse) -> int {
 compiler_command :: proc(verb: string, p: ^Parse) -> [dynamic]string {
 	src := p.positional if p.positional != "" else SRC
 	optimization := p.values["o"] or_else "debug"
-	linker := p.values["linker"] or_else LINKER
 	link := p.values["link"] or_else "dynamic"
 
 	command := make([dynamic]string, context.temp_allocator)
@@ -171,7 +170,7 @@ compiler_command :: proc(verb: string, p: ^Parse) -> [dynamic]string {
 		append(&command, fmt.tprintf("-o:%s", optimization))
 	}
 	when ODIN_OS == .Darwin do append(&command, "-use-single-module")
-	append(&command, fmt.tprintf("-linker:%s", linker))
+	append(&command, "-linker:" + LINKER)
 	// Static pulls libc into the binary, so it runs on any Linux of its architecture, not
 	// only on systems with the glibc it was built against.
 	if link == "static" do append(&command, "-extra-linker-flags:-static")
@@ -187,11 +186,6 @@ commands :: proc() -> []Command {
 			arg = "<level>",
 			allowed = []string{"none", "minimal", "size", "speed", "aggressive"},
 			help = "Sets the optimization mode, defaulting to a debug build.",
-		},
-		{
-			name = "linker",
-			arg = "<name>",
-			help = "Sets the linker to use, defaulting to '" + LINKER + "'.",
 		},
 		{
 			name = "link",
