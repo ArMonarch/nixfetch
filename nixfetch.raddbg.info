@@ -3,7 +3,7 @@
 target:
 {
   executable: "target/debug/nixfetch"
-  working_directory: "../nixfetch"
+  working_directory: "."
   enabled: 1
 }
 
