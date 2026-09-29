@@ -1,5 +1,12 @@
 // raddbg 0.9.29 project file
 
+target:
+{
+  executable: "target/debug/nixfetch"
+  working_directory: "../nixfetch"
+  enabled: 1
+}
+
 theme_color:
 {
   tags: background
@@ -344,10 +351,4 @@ theme_color:
 {
   tags: "drop_site border"
   value: 0xc4a7e71f
-}
-target:
-{
-  executable: "target/debug/nixfetch"
-  working_directory: "../nixfetch"
-  enabled: 1
 }
