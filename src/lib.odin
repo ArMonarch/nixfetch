@@ -1,5 +1,12 @@
 package nixfetch
 
+import "base:runtime"
+import "core:encoding/base64"
+import "core:fmt"
+import "core:os"
+import "core:strings"
+import "core:sys/linux"
+
 // which layout to print, fixed at build time: -define:NIXFETCH_LAYOUT=269
 // the default is 110, also used for any unrecognised number;
 //   110 Icons   - icon, label, ":", value, with a color palette row      (image 1)
@@ -81,49 +88,156 @@ SystemInformation :: struct {
 }
 
 collect_system_information :: proc(sys: ^SystemInformation) -> Error {
-	when LAYOUT == 252 do return collect_system_information_layout_252(sys)
-	when LAYOUT == 269 do return collect_system_information_layout_269(sys)
-	when LAYOUT == 227 do return collect_system_information_layout_227(sys)
-	return collect_system_information_layout_110(sys)
+	uts_name: linux.UTS_Name
+	linux.uname(&uts_name)
+
+	when LAYOUT == 252 {
+		return collect_system_information_layout_252(sys, &uts_name)
+	} else when LAYOUT == 269 {
+		return collect_system_information_layout_269(sys, &uts_name)
+	} else when LAYOUT == 227 {
+		return collect_system_information_layout_227(sys, &uts_name)
+	} else {
+		return collect_system_information_layout_110(sys, &uts_name)
+	}
 }
 
-collect_system_information_layout_110 :: proc(sys: ^SystemInformation) -> Error {
+collect_system_information_layout_110 :: proc(
+	sys: ^SystemInformation,
+	uts: ^linux.UTS_Name,
+) -> Error {
+	assert(sys != nil)
+	assert(uts != nil)
+	assert(uts.sysname != {})
+
+	sys.user_info = get_user_info(uts, context.temp_allocator) or_return
+	sys.terminal_info = get_terminal_info(context.allocator) or_return
 	return nil
 }
 
-collect_system_information_layout_252 :: proc(sys: ^SystemInformation) -> Error {
+collect_system_information_layout_252 :: proc(
+	sys: ^SystemInformation,
+	uts: ^linux.UTS_Name,
+) -> Error {
 	return nil
 }
 
-collect_system_information_layout_269 :: proc(sys: ^SystemInformation) -> Error {
+collect_system_information_layout_269 :: proc(
+	sys: ^SystemInformation,
+	uts: ^linux.UTS_Name,
+) -> Error {
 	return nil
 }
 
-collect_system_information_layout_227 :: proc(sys: ^SystemInformation) -> Error {
+collect_system_information_layout_227 :: proc(
+	sys: ^SystemInformation,
+	uts: ^linux.UTS_Name,
+) -> Error {
 	return nil
+}
+
+get_user_info :: proc(uts: ^linux.UTS_Name, allocator: runtime.Allocator) -> (string, Error) {
+	user, user_set := os.lookup_env("USER", context.temp_allocator)
+	if !user_set do user = "user"
+	host := string(cstring(&uts.nodename[0]))
+	return fmt.aprintf(
+			BOLD + FG_BLUE + "%s" + RESET + "@" + FG_GREEN + "%s" + RESET,
+			user,
+			host,
+			allocator = allocator,
+		),
+		nil
+}
+
+// the terminal as TERM_PROGRAM names it (ghostty, WezTerm, tmux, ...), "unknown" when unset
+get_terminal_info :: proc(allocator: runtime.Allocator) -> (string, Error) {
+	program, ok := os.lookup_env("TERM_PROGRAM", allocator)
+	if !ok || program == "" do return "unknown", nil
+	return program, nil
 }
 
 print_system_information :: proc(sys: ^SystemInformation) -> (string, Error) {
-	when LAYOUT == 252 do return print_system_information_layout_252(sys)
-	when LAYOUT == 269 do return print_system_information_layout_269(sys)
-	when LAYOUT == 227 do return print_system_information_layout_227(sys)
-	return print_system_information_layout_110(sys)
+	image, _ := os.lookup_env("NIXFETCH_IMAGE", context.allocator)
+	// the image goes over the Kitty graphics protocol, which only these terminals speak
+	if sys.terminal_info != "ghostty" && sys.terminal_info != "kitty" do image = ""
+
+	builder: strings.Builder
+	if _, err := strings.builder_init(&builder, context.allocator); err != nil {
+		return {}, .Arena_Out_Of_Memory
+	}
+
+	err: Error
+	when LAYOUT == 252 {
+		err = print_system_information_layout_252(&builder, sys, image)
+	} else when LAYOUT == 269 {
+		err = print_system_information_layout_269(&builder, sys, image)
+	} else when LAYOUT == 227 {
+		err = print_system_information_layout_227(&builder, sys, image)
+	} else {
+		err = print_system_information_layout_110(&builder, sys, image)
+	}
+	if err != nil do return {}, err
+
+	return strings.to_string(builder), nil
 }
 
-print_system_information_layout_110 :: proc(sys: ^SystemInformation) -> (string, Error) {
-	return "nixfetch 110", nil
+print_system_information_layout_110 :: proc(
+	builder: ^strings.Builder,
+	sys: ^SystemInformation,
+	image: string,
+) -> Error {
+	strings.write_string(builder, "\n")
+	has_image := image != ""
+	width := IMAGE_WIDTH if has_image else LOGO_WIDTH
+
+	if !has_image do strings.write_string(builder, NIX_LOGO_ANSI_COLORED[0])
+	fmt.sbprintf(builder, "%*s", width, "")
+	strings.write_string(builder, sys.user_info)
+
+	// the fields are written first, so for the image go back to the first field's line, column 1;
+	// the cursor already sits on the last field's line, hence one line fewer. CSI 0 A would still
+	// move up one, so nothing is written when there is a single line.
+	layout_fields_count :: 1
+	if has_image {
+		strings.write_byte(builder, '\r')
+		fmt.sbprintf(builder, "\x1b[%dA", layout_fields_count - 1)
+		write_kitty_image(builder, image)
+	}
+	return nil
 }
 
-print_system_information_layout_252 :: proc(sys: ^SystemInformation) -> (string, Error) {
-	return "nixfetch 252", nil
+// writes the escape that draws the PNG at path over the Kitty graphics protocol; t=f sends the
+// path, not the pixels, so the terminal reads the file itself
+write_kitty_image :: #force_inline proc(builder: ^strings.Builder, path: string) {
+	encoded_path := base64.encode(transmute([]byte)path, allocator = context.temp_allocator)
+	fmt.sbprintf(builder, "  \x1b_Ga=T,f=100,t=f,c=%d;%s\x1b\\", IMAGE_WIDTH - 4, encoded_path)
 }
 
-print_system_information_layout_269 :: proc(sys: ^SystemInformation) -> (string, Error) {
-	return "nixfetch 269", nil
+print_system_information_layout_252 :: proc(
+	builder: ^strings.Builder,
+	sys: ^SystemInformation,
+	image: string,
+) -> Error {
+	strings.write_string(builder, "nixfetch 252")
+	return nil
 }
 
-print_system_information_layout_227 :: proc(sys: ^SystemInformation) -> (string, Error) {
-	return "nixfetch 227", nil
+print_system_information_layout_269 :: proc(
+	builder: ^strings.Builder,
+	sys: ^SystemInformation,
+	image: string,
+) -> Error {
+	strings.write_string(builder, "nixfetch 269")
+	return nil
+}
+
+print_system_information_layout_227 :: proc(
+	builder: ^strings.Builder,
+	sys: ^SystemInformation,
+	image: string,
+) -> Error {
+	strings.write_string(builder, "nixfetch 227")
+	return nil
 }
 
 // cells the NixOS logo takes up, so system info lines up on the right
@@ -132,28 +246,7 @@ LOGO_WIDTH: int : 39
 // cells a custom image takes up over the Kitty graphics protocol
 IMAGE_WIDTH: int : 45
 
-// the NixOS logo, each line padded to LOGO_WIDTH
-@(rodata)
-NIX_LOGO_BLACK_WHITE := [?]string {
-	"         ◢██◣     ◥███◣  ◢██◣          ",
-	"         ◥███◣     ◥███◣◢███◤          ",
-	"          ◥███◣     ◥██████◤           ",
-	"      ◢███████████████████◤   ◢◣       ",
-	"     ◢████████████████████◣  ◢██◣      ",
-	"          ◢███◤        ◥███◣◢███◤      ",
-	"         ◢███◤          ◥██████◤       ",
-	"  ◢█████████◤            ◥█████████◣   ",
-	"  ◥█████████◣            ◢█████████◤   ",
-	"      ◢██████◣          ◢███◤          ",
-	"     ◢███◤◥███◣        ◢███◤           ",
-	"     ◥██◤  ◥████████████████████◤      ",
-	"      ◥◤   ◢███████████████████◤       ",
-	"          ◢██████◣     ◥███◣           ",
-	"         ◢███◤◥███◣     ◥███◣          ",
-	"         ◥██◤  ◥███◣     ◥██◤          ",
-}
-
-// the ansi colored variant of the NixOS logo
+// the NixOS logo in ANSI colors, each line padded to LOGO_WIDTH
 @(rodata)
 NIX_LOGO_ANSI_COLORED := [?]string {
 	"  [38;2;82;119;195m       ◢██◣[38;2;127;183;255m     ◥███◣  ◢██◣          ",
