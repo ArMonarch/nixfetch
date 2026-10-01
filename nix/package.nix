@@ -6,6 +6,8 @@
   glibc,
   # link libc into the binary, so it runs on any Linux and not just NixOS
   static ? false,
+  # print a nerd font icon before each label; nixfetch.override { icons = false; } for plain labels
+  icons ? true,
 }:
 stdenv.mkDerivation {
   pname = "nixfetch";
@@ -29,7 +31,7 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     # with glibc.static on the search path the build script finds libc.a too, so link it statically as well
-    odin run build.odin -file ${lib.optionalString static "-extra-linker-flags:-static"} -- build -o:aggressive -link:${if static then "static" else "dynamic"}
+    odin run build.odin -file ${lib.optionalString static "-extra-linker-flags:-static"} -- build -o:aggressive ${lib.optionalString static "-link:static"} ${lib.optionalString (!icons) "-icons:false"}
     runHook postBuild
   '';
 
