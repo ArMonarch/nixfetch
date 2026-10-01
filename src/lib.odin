@@ -155,7 +155,7 @@ collect_system_information_layout_227 :: proc(
 }
 
 get_user_info :: proc(uts: ^linux.UTS_Name, allocator: runtime.Allocator) -> (string, Error) {
-	user, user_set := os.lookup_env("USER", context.temp_allocator)
+	user, user_set := get_env("USER", context.temp_allocator)
 	if !user_set do user = "user"
 	host := string(cstring(&uts.nodename[0]))
 	return fmt.aprintf(
@@ -187,7 +187,7 @@ get_kernel_info :: proc(uts: ^linux.UTS_Name, allocator: runtime.Allocator) -> (
 
 // the login shell's name from SHELL, "fish" for /run/current-system/sw/bin/fish; "unknown" when unset
 get_shell_info :: proc(allocator: runtime.Allocator) -> (string, Error) {
-	shell, ok := os.lookup_env("SHELL", allocator)
+	shell, ok := get_env("SHELL", allocator)
 	if !ok || shell == "" do return "unknown", nil
 	return shell[strings.last_index_byte(shell, '/') + 1:], nil
 }
@@ -195,8 +195,8 @@ get_shell_info :: proc(allocator: runtime.Allocator) -> (string, Error) {
 // the desktop and its display protocol, "niri (wayland)", from XDG_CURRENT_DESKTOP and
 // XDG_SESSION_TYPE; either one that is unset shows as "unknown"
 get_desktop_info :: proc(allocator: runtime.Allocator) -> (string, Error) {
-	desktop, _ := os.lookup_env("XDG_CURRENT_DESKTOP", context.temp_allocator)
-	session, _ := os.lookup_env("XDG_SESSION_TYPE", context.temp_allocator)
+	desktop, _ := get_env("XDG_CURRENT_DESKTOP", context.temp_allocator)
+	session, _ := get_env("XDG_SESSION_TYPE", context.temp_allocator)
 	if desktop == "" do desktop = "unknown"
 	if session == "" do session = "unknown"
 	return fmt.aprintf("%s (%s)", desktop, session, allocator = allocator), nil
@@ -305,23 +305,57 @@ get_os_info :: proc(allocator: runtime.Allocator) -> (string, Error) {
 	return "unknown", nil
 }
 
+// an environment variable's value copied into allocator, as os.lookup_env returns it. The
+// allocating os.lookup_env builds the key's cstring in core:os's own scratch arena, which mallocs
+// 4 MB on first use; the buffer form allocates nothing, so only the value is copied out.
+// Values over ENV_VALUE_MAX bytes count as unset.
+get_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+	ENV_VALUE_MAX :: 2048
+
+	buffer: [ENV_VALUE_MAX]byte
+	raw, err := os.lookup_env(buffer[:], key)
+	if err != nil do return "", false
+
+	cloned, clone_err := strings.clone(raw, allocator)
+	if clone_err != nil do return "", false
+	return cloned, true
+}
+
 // a file's contents without trailing whitespace or NUL, as /sys and /proc files end in a newline
-// and device tree strings in a NUL; "" when the file cannot be read
-read_entire_file :: proc(path: string, allocator := context.temp_allocator) -> string {
-	data, err := os.read_entire_file(path, allocator)
-	if err != nil do return ""
-	return strings.trim_right(string(data), " \t\r\n\x00")
+// and device tree strings in a NUL; "" when the file cannot be read. Straight open/read/close:
+// os.read_entire_file also readlinks and stats every file, which doubles the syscalls. The files
+// read here are under a page, so anything past READ_FILE_MAX bytes is cut off.
+read_entire_file :: proc(path: cstring, allocator := context.temp_allocator) -> string {
+	READ_FILE_MAX :: 4096
+
+	fd, open_err := linux.open(path, {.CLOEXEC})
+	if open_err != .NONE do return ""
+	defer linux.close(fd)
+
+	buffer, alloc_err := make([]byte, READ_FILE_MAX, allocator)
+	if alloc_err != nil do return ""
+
+	// a read that comes back short has reached the end, for regular files as for these small
+	// /proc and /sys ones, so only a full read is followed by another
+	length := 0
+	for length < len(buffer) {
+		n, read_err := linux.read(fd, buffer[length:])
+		if read_err != .NONE do break
+		length += n
+		if n < len(buffer) - (length - n) do break
+	}
+	return strings.trim_right(string(buffer[:length]), " \t\r\n\x00")
 }
 
 // the terminal as TERM_PROGRAM names it (ghostty, WezTerm, tmux, ...), "unknown" when unset
 get_terminal_info :: proc(allocator: runtime.Allocator) -> (string, Error) {
-	program, ok := os.lookup_env("TERM_PROGRAM", allocator)
+	program, ok := get_env("TERM_PROGRAM", allocator)
 	if !ok || program == "" do return "unknown", nil
 	return program, nil
 }
 
 print_system_information :: proc(sys: ^SystemInformation) -> (string, Error) {
-	image, _ := os.lookup_env("NIXFETCH_IMAGE", context.allocator)
+	image, _ := get_env("NIXFETCH_IMAGE", context.allocator)
 	// the image goes over the Kitty graphics protocol, which only these terminals speak
 	if sys.terminal_info != "ghostty" && sys.terminal_info != "kitty" do image = ""
 

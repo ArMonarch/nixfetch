@@ -3,10 +3,12 @@ package nixfetch
 import "core:fmt"
 import "core:mem"
 import "core:os"
-import "core:sys/linux"
 import "core:terminal"
 
 ARENA_SIZE :: 4 * mem.Megabyte
+
+// zeroed .bss, so the kernel only backs the pages the arena actually touches; no allocation at startup
+arena_buffer: [ARENA_SIZE]byte
 
 Error :: enum {
 	None,
@@ -17,13 +19,7 @@ main :: proc() {
 	assert(terminal.color_enabled == true, "terminal must accept colors escape codes")
 
 	arena: mem.Arena
-	arena_buffer, alloc_err := make([]byte, ARENA_SIZE, os.heap_allocator())
-	if alloc_err != nil {
-		fmt.eprintfln("nixfetch: could not allocate the %d byte arena: %v", ARENA_SIZE, alloc_err)
-		os.exit(1)
-	}
-
-	mem.arena_init(&arena, arena_buffer)
+	mem.arena_init(&arena, arena_buffer[:])
 	context.allocator = mem.arena_allocator(&arena)
 	context.temp_allocator = context.allocator
 
@@ -39,6 +35,6 @@ run :: proc() -> Error {
 	str, err := print_system_information(&sys)
 	if err != nil do return err
 	assert(len(str) != 0, "system information must not be nil")
-	fmt.println(str)
+	fmt.print(str)
 	return nil
 }
