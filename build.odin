@@ -174,6 +174,10 @@ compiler_command :: proc(verb: string, p: ^Parse) -> [dynamic]string {
 	// Static pulls libc into the binary, so it runs on any Linux of its architecture, not
 	// only on systems with the glibc it was built against.
 	if link == "static" do append(&command, "-extra-linker-flags:-static")
+
+	// nixfetch's own compile-time settings, see the #config values in src/lib.odin
+	if layout, ok := p.values["layout"]; ok do append(&command, fmt.tprintf("-define:NIXFETCH_LAYOUT=%s", layout))
+	if icons, ok := p.values["icons"]; ok do append(&command, fmt.tprintf("-define:NIXFETCH_ICONS=%s", icons))
 	return command
 }
 
@@ -192,6 +196,18 @@ commands :: proc() -> []Command {
 			arg = "<mode>",
 			allowed = []string{"dynamic", "static"},
 			help = "Links libc dynamically or statically, defaulting to dynamic.",
+		},
+		{
+			name = "layout",
+			arg = "<number>",
+			allowed = []string{"110", "252", "269", "227"},
+			help = "Sets the layout nixfetch prints, defaulting to 110.",
+		},
+		{
+			name = "icons",
+			arg = "<bool>",
+			allowed = []string{"true", "false"},
+			help = "Prints a nerd font icon before each label, defaulting to true.",
 		},
 	}
 
