@@ -242,8 +242,27 @@ get_uptime_info :: proc(allocator: runtime.Allocator) -> (string, Error) {
 // memory in use as free(1) counts it, MemTotal - MemAvailable: "12.11 GiB / 15.40 GiB (79%)";
 // "unknown" when meminfo lacks either
 get_memory_info :: proc(meminfo: string, allocator: runtime.Allocator) -> (string, Error) {
-	total_kib := meminfo_kib(meminfo, "MemTotal")
-	available_kib := meminfo_kib(meminfo, "MemAvailable")
+	meminfo := meminfo
+	total_kib, available_kib := -1, -1
+	for line in strings.split_lines_iterator(&meminfo) {
+		name, _, rest := strings.partition(line, ":")
+		if name != "MemTotal" && name != "MemAvailable" do continue
+
+		if name == "MemTotal" {
+			value, ok := strconv.parse_int(
+				strings.trim_space(strings.trim_suffix(strings.trim_space(rest), "kB")),
+			)
+			if ok do total_kib = value
+		}
+		if name == "MemAvailable" {
+			value, ok := strconv.parse_int(
+				strings.trim_space(strings.trim_suffix(strings.trim_space(rest), "kB")),
+			)
+			if ok do available_kib = value
+		}
+		if total_kib >= 0 && available_kib >= 0 do break
+	}
+
 	if total_kib <= 0 || available_kib < 0 do return "unknown", nil
 	return format_usage(total_kib - available_kib, total_kib, allocator), nil
 }
@@ -251,25 +270,30 @@ get_memory_info :: proc(meminfo: string, allocator: runtime.Allocator) -> (strin
 // swap in use, SwapTotal - SwapFree, in the same form as memory; "disabled" without swap,
 // "unknown" when meminfo lacks either
 get_swap_info :: proc(meminfo: string, allocator: runtime.Allocator) -> (string, Error) {
-	total_kib := meminfo_kib(meminfo, "SwapTotal")
-	free_kib := meminfo_kib(meminfo, "SwapFree")
+	meminfo := meminfo
+	total_kib, free_kib := -1, -1
+	for line in strings.split_lines_iterator(&meminfo) {
+		name, _, rest := strings.partition(line, ":")
+		if name != "SwapTotal" && name != "SwapFree" do continue
+
+		if name == "SwapTotal" {
+			value, ok := strconv.parse_int(
+				strings.trim_space(strings.trim_suffix(strings.trim_space(rest), "kB")),
+			)
+			if ok do total_kib = value
+		}
+		if name == "SwapFree" {
+			value, ok := strconv.parse_int(
+				strings.trim_space(strings.trim_suffix(strings.trim_space(rest), "kB")),
+			)
+			if ok do free_kib = value
+		}
+		if total_kib >= 0 && free_kib >= 0 do break
+	}
+
 	if total_kib < 0 || free_kib < 0 do return "unknown", nil
 	if total_kib == 0 do return "disabled", nil
 	return format_usage(total_kib - free_kib, total_kib, allocator), nil
-}
-
-// the value of a "<key>: <value> kB" line in /proc/meminfo, -1 when the key is missing
-meminfo_kib :: proc(meminfo: string, key: string) -> int {
-	meminfo := meminfo
-	for line in strings.split_lines_iterator(&meminfo) {
-		name, _, rest := strings.partition(line, ":")
-		if name != key do continue
-		value, ok := strconv.parse_int(
-			strings.trim_space(strings.trim_suffix(strings.trim_space(rest), "kB")),
-		)
-		return value if ok else -1
-	}
-	return -1
 }
 
 // "<used> GiB / <total> GiB (<percent>%)" with the percentage green below 80, yellow below 90,
@@ -277,7 +301,7 @@ meminfo_kib :: proc(meminfo: string, key: string) -> int {
 format_usage :: proc(used_kib, total_kib: int, allocator: runtime.Allocator) -> string {
 	KIB_PER_GIB :: 1024 * 1024
 	percent := used_kib * 100 / total_kib
-	color := FG_GREEN if percent < 80 else FG_YELLOW if percent < 90 else FG_RED
+	color := FG_GREEN if percent < 80 else (FG_YELLOW if percent < 90 else FG_RED)
 	return fmt.aprintf(
 		"%.2f GiB / %.2f GiB (%s%d%%" + RESET + ")",
 		f64(used_kib) / KIB_PER_GIB,
