@@ -31,7 +31,7 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     # with glibc.static on the search path the build script finds libc.a too, so link it statically as well
-    odin run build.odin -file ${lib.optionalString static "-extra-linker-flags:-static"} -- build -o:aggressive ${lib.optionalString static "-link:static"} ${lib.optionalString (!icons) "-icons:false"}
+    odin run build.odin -file ${lib.optionalString static "-extra-linker-flags:-static"} -- build -o:aggressive ${lib.optionalString static "-static"} ${lib.optionalString icons "-icons"}
     runHook postBuild
   '';
 
