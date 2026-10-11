@@ -40,7 +40,7 @@
 
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            odin-bin."dev-2026-09"
+            odin-bin."dev-2026-10"
             ols-bin."dev-2026-08"
             lld
           ];
