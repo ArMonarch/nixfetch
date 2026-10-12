@@ -370,15 +370,9 @@ print_system_information :: proc(sys: ^SystemInformation) -> (string, Error) {
 	// the image goes over the Kitty graphics protocol, which only these terminals speak
 	if sys.terminal_info != "ghostty" && sys.terminal_info != "kitty" do image = ""
 
-	FIELDS_COUNT :: size_of(SystemInformation) / size_of(string)
-	#assert(size_of(SystemInformation) % size_of(string) == 0)
-	LINE_OVERHEAD :: 128
-	capacity := 2 * len(image) + LINE_OVERHEAD * (len(NIX_LOGO_ANSI_COLORED) + FIELDS_COUNT + 4)
-	for line in NIX_LOGO_ANSI_COLORED do capacity += len(line)
-	for field in transmute([FIELDS_COUNT]string)sys^ do capacity += len(field)
-
+	PRINT_BUFFER_SIZE :: 1 * runtime.Megabyte
 	builder: strings.Builder
-	if _, err := strings.builder_init(&builder, 0, capacity, context.allocator); err != nil {
+	if _, err := strings.builder_init(&builder, 0, PRINT_BUFFER_SIZE, context.allocator); err != nil {
 		return {}, .Arena_Out_Of_Memory
 	}
 
@@ -389,7 +383,7 @@ print_system_information :: proc(sys: ^SystemInformation) -> (string, Error) {
 	} else {
 		print_system_information_minimal(&builder, sys, image)
 	}
-	assert(cap(builder.buf) == capacity, "a layout wrote past the capacity reserved for it")
+	assert(cap(builder.buf) == PRINT_BUFFER_SIZE, "a layout wrote past the capacity reserved for it")
 
 	return strings.to_string(builder), nil
 }
@@ -445,8 +439,6 @@ print_system_information_minimal :: proc(
 		fmt.sbprintf(builder, "\x1b[%dA", layout_fields_count)
 		write_kitty_image(builder, image)
 	}
-
-	strings.write_rune(builder, '\n')
 }
 
 // writes one field's line: the gap beside the logo or image, the label in bold cyan padded to 10

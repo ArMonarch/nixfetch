@@ -31,10 +31,9 @@ main :: proc() {
 
 run :: proc() -> Error {
 	sys: SystemInformation
-	if err := collect_system_information(&sys); err != nil do return err
-	str, err := print_system_information(&sys)
-	if err != nil do return err
+	collect_system_information(&sys) or_return
+	str := print_system_information(&sys) or_return
 	assert(len(str) != 0, "system information must not be nil")
-	fmt.print(str)
+	fmt.println(str)
 	return nil
 }
