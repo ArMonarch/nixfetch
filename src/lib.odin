@@ -8,13 +8,6 @@ import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
 
-// which layout to print, fixed at build time: -define:NIXFETCH_LAYOUT=2
-// the default is 0, also used for any unrecognised number;
-//   0 minimal    - the fields beside the logo, one "label → value" line each
-//   1 full       - as minimal, with every field nixfetch gathers
-//   2 structured - the fields split into software, hardware and session blocks
-LAYOUT :: #config(NIXFETCH_LAYOUT, 0)
-
 // print "<icon> <label> → <value>" when true, "<label> → <value>" when false: -define:NIXFETCH_ICONS=false
 SHOW_ICONS :: #config(NIXFETCH_ICONS, true)
 
@@ -63,61 +56,52 @@ FG_GRAY :: "\x1b[90m"
 // the chosen layout uses get filled; the strings live in the arena main sets up.
 SystemInformation :: struct {
 	user_info:     string,
-	os_name:       string,
+
+	// hardware
 	host_info:     string,
-	kernel_info:   string,
-	uptime:        string,
-	packages_info: string,
-	shell_info:    string,
-	display_info:  string,
-	desktop_info:  string,
-	theme_info:    string,
-	icons_info:    string,
-	cursor_info:   string,
-	terminal_info: string,
-	terminal_font: string,
 	cpu_info:      string,
 	gpu_info:      string,
 	memory_info:   string,
 	swap_info:     string,
 	disk_info:     string,
-	local_ip:      string,
+	display_info:  string,
 	battery_info:  string,
-	locale:        string,
+
+	// software
+	os_name:       string,
+	kernel_info:   string,
+	packages_info: string,
+	shell_info:    string,
+	desktop_info:  string,
+	terminal_info: string,
+	terminal_font: string,
+	theme_info:    string,
+	icons_info:    string,
+	cursor_info:   string,
 	os_age:        string,
+
+	// session
+	uptime:        string,
+	locale:        string,
+	local_ip:      string,
 	colors:        string,
 }
 
 collect_system_information :: proc(sys: ^SystemInformation) -> Error {
+	assert(sys != nil)
 	uts_name: linux.UTS_Name
 	linux.uname(&uts_name)
-
-	when LAYOUT == 1 {
-		return collect_system_information_full(sys, &uts_name)
-	} else when LAYOUT == 2 {
-		return collect_system_information_structured(sys, &uts_name)
-	} else {
-		return collect_system_information_minimal(sys, &uts_name)
-	}
-}
-
-collect_system_information_minimal :: proc(
-	sys: ^SystemInformation,
-	uts: ^linux.UTS_Name,
-) -> Error {
-	assert(sys != nil)
-	assert(uts != nil)
-	assert(uts.sysname != {})
+	assert(uts_name.sysname != {})
 
 	// one nf-fa-circle per base color, so the row shows the terminal's own palette
 	// odinfmt: disable
 	COLORS :: FG_RED + "  " + FG_GREEN + "  " + FG_YELLOW + "  " + FG_BLUE + "  " + FG_MAGENTA + "  " + FG_CYAN + "  " + FG_WHITE + "  " + RESET
 	// odinfmt: enable
 
-	sys.user_info = get_user_info(uts, context.temp_allocator) or_return
+	sys.user_info = get_user_info(&uts_name, context.temp_allocator) or_return
 	sys.os_name = get_os_info(context.allocator) or_return
 	sys.host_info = get_host_info(context.allocator) or_return
-	sys.kernel_info = get_kernel_info(uts, context.allocator) or_return
+	sys.kernel_info = get_kernel_info(&uts_name, context.allocator) or_return
 	sys.shell_info = get_shell_info(context.allocator) or_return
 	sys.desktop_info = get_desktop_info(context.allocator) or_return
 	sys.uptime = get_uptime_info(context.allocator) or_return
@@ -127,17 +111,6 @@ collect_system_information_minimal :: proc(
 
 	sys.colors = COLORS
 	sys.terminal_info = get_terminal_info(context.allocator) or_return
-	return nil
-}
-
-collect_system_information_full :: proc(sys: ^SystemInformation, uts: ^linux.UTS_Name) -> Error {
-	return nil
-}
-
-collect_system_information_structured :: proc(
-	sys: ^SystemInformation,
-	uts: ^linux.UTS_Name,
-) -> Error {
 	return nil
 }
 
@@ -372,23 +345,21 @@ print_system_information :: proc(sys: ^SystemInformation) -> (string, Error) {
 
 	PRINT_BUFFER_SIZE :: 1 * runtime.Megabyte
 	builder: strings.Builder
-	if _, err := strings.builder_init(&builder, 0, PRINT_BUFFER_SIZE, context.allocator); err != nil {
+	if _, err := strings.builder_init(&builder, 0, PRINT_BUFFER_SIZE, context.allocator);
+	   err != nil {
 		return {}, .Arena_Out_Of_Memory
 	}
 
-	when LAYOUT == 1 {
-		print_system_information_full(&builder, sys, image)
-	} else when LAYOUT == 2 {
-		print_system_information_structured(&builder, sys, image)
-	} else {
-		print_system_information_minimal(&builder, sys, image)
-	}
-	assert(cap(builder.buf) == PRINT_BUFFER_SIZE, "a layout wrote past the capacity reserved for it")
+	write_system_information(&builder, sys, image)
+	assert(
+		cap(builder.buf) == PRINT_BUFFER_SIZE,
+		"nixfetch wrote past the capacity reserved for it",
+	)
 
 	return strings.to_string(builder), nil
 }
 
-print_system_information_minimal :: proc(
+write_system_information :: proc(
 	builder: ^strings.Builder,
 	sys: ^SystemInformation,
 	image: string,
@@ -412,22 +383,22 @@ print_system_information_minimal :: proc(
 	write_field(builder, width, ICON_KERNEL, "Kernel", sys.kernel_info)
 
 	if !has_image do strings.write_string(builder, NIX_LOGO_ANSI_COLORED[4])
-	write_field(builder, width, ICON_SHELL, "Shell", sys.shell_info)
+	write_field(builder, width, ICON_UPTIME, "Uptime", sys.uptime)
 
 	if !has_image do strings.write_string(builder, NIX_LOGO_ANSI_COLORED[5])
-	write_field(builder, width, ICON_DESKTOP, "Desktop", sys.desktop_info)
+	write_field(builder, width, ICON_SHELL, "Shell", sys.shell_info)
 
 	if !has_image do strings.write_string(builder, NIX_LOGO_ANSI_COLORED[6])
-	write_field(builder, width, ICON_MEMORY, "Memory", sys.memory_info)
+	write_field(builder, width, ICON_DESKTOP, "Desktop", sys.desktop_info)
 
 	if !has_image do strings.write_string(builder, NIX_LOGO_ANSI_COLORED[7])
-	write_field(builder, width, ICON_SWAP, "Swap", sys.swap_info)
-
-	if !has_image do strings.write_string(builder, NIX_LOGO_ANSI_COLORED[8])
 	write_field(builder, width, ICON_TERMINAL, "Terminal", sys.terminal_info)
 
+	if !has_image do strings.write_string(builder, NIX_LOGO_ANSI_COLORED[8])
+	write_field(builder, width, ICON_MEMORY, "Memory", sys.memory_info)
+
 	if !has_image do strings.write_string(builder, NIX_LOGO_ANSI_COLORED[9])
-	write_field(builder, width, ICON_UPTIME, "Uptime", sys.uptime)
+	write_field(builder, width, ICON_SWAP, "Swap", sys.swap_info)
 
 	if !has_image do strings.write_string(builder, NIX_LOGO_ANSI_COLORED[10])
 	write_field(builder, width, ICON_COLORS, "Colors", sys.colors)
@@ -441,7 +412,7 @@ print_system_information_minimal :: proc(
 	}
 }
 
-// writes one field's line: the gap beside the logo or image, the label in bold cyan padded to 10
+// writes one field's line: the gap beside the logo or image, the label in bold cyan padded to 14
 // cells, a gray "→ ", the value and a newline; the label leads with its icon when built with icons,
 // -define:NIXFETCH_ICONS=true
 write_field :: #force_inline proc(
@@ -451,7 +422,7 @@ write_field :: #force_inline proc(
 ) {
 	fmt.sbprintf(
 		builder,
-		"%*s" + BOLD + FG_CYAN + "%s%-10s" + RESET + FG_GRAY + "→ " + RESET + "%s\n",
+		"%*s" + BOLD + FG_CYAN + "%s%-14s" + RESET + FG_GRAY + "→ " + RESET + "%s\n",
 		width,
 		"",
 		icon if SHOW_ICONS else "",
@@ -467,24 +438,8 @@ write_kitty_image :: #force_inline proc(builder: ^strings.Builder, path: string)
 	fmt.sbprintf(builder, "  \x1b_Ga=T,f=100,t=f,c=%d;%s\x1b\\", IMAGE_WIDTH - 4, encoded_path)
 }
 
-print_system_information_full :: proc(
-	builder: ^strings.Builder,
-	sys: ^SystemInformation,
-	image: string,
-) {
-	strings.write_string(builder, "nixfetch full")
-}
-
-print_system_information_structured :: proc(
-	builder: ^strings.Builder,
-	sys: ^SystemInformation,
-	image: string,
-) {
-	strings.write_string(builder, "nixfetch structured")
-}
-
 // cells the NixOS logo takes up, so system info lines up on the right
-LOGO_WIDTH: int : 39
+LOGO_WIDTH: int : 2
 
 // cells a custom image takes up over the Kitty graphics protocol
 IMAGE_WIDTH: int : 45

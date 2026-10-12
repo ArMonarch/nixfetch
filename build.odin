@@ -26,14 +26,12 @@ Optimization :: enum {
 
 Build :: struct {
 	o:      Optimization `usage:"Sets the optimization mode: minimal, size, speed or aggressive, defaulting to debug."`,
-	layout: int `usage:"Sets the layout nixfetch prints: 0 minimal, 1 full or 2 structured, defaulting to 0."`,
 	static: bool `usage:"Links libc statically, so the binary runs on any Linux of its architecture."`,
 	icons:  bool `usage:"Prints a nerd font icon before each label, off unless given."`,
 }
 
 Run :: struct {
 	o:      Optimization `usage:"Sets the optimization mode: minimal, size, speed or aggressive, defaulting to debug."`,
-	layout: int `usage:"Sets the layout nixfetch prints: 0 minimal, 1 full or 2 structured, defaulting to 0."`,
 	static: bool `usage:"Links libc statically, so the binary runs on any Linux of its architecture."`,
 	icons:  bool `usage:"Prints a nerd font icon before each label, off unless given."`,
 }
@@ -115,8 +113,6 @@ print_usage :: proc() {
 // Each command gets its own name as args[0], the program name for its usage and errors.
 // Exits with the command's status, so a failed compile fails the nix build that runs this.
 main :: proc() {
-	flags.register_flag_checker(check_flag)
-
 	if len(os.args) < 2 {
 		print_usage()
 		os.exit(1)
@@ -140,7 +136,7 @@ main :: proc() {
 }
 
 // The flags shared by `build` and `run`, built in one place so the two cannot drift apart.
-// Takes either's options, which share the o, layout and static fields.
+// Takes either's options, which share the o, static and icons fields.
 compiler_command :: proc(verb: string, opt: $T) -> (command: [dynamic]string) {
 	command = make([dynamic]string, context.temp_allocator)
 	append(&command, "odin", verb, SRC)
@@ -159,28 +155,9 @@ compiler_command :: proc(verb: string, opt: $T) -> (command: [dynamic]string) {
 	// only on systems with the glibc it was built against.
 	if opt.static do append(&command, "-extra-linker-flags:-static")
 
-	// nixfetch's own compile-time settings, see the #config values in src/lib.odin. Layout 0
-	// is the flag left off, which leaves nixfetch's own default; check_flag vets the rest.
-	if opt.layout != 0 do append(&command, fmt.tprintf("-define:NIXFETCH_LAYOUT=%d", opt.layout))
+	// nixfetch's own compile-time settings, see the #config values in src/lib.odin
 	append(&command, fmt.tprintf("-define:NIXFETCH_ICONS=%v", opt.icons))
 	return command
-}
-
-// Registered with core:flags, which calls it for each flag that was set, after its own
-// checks. A non-empty return is the error parse_or_exit prints before exiting 1.
-check_flag :: proc(model: rawptr, name: string, value: any, args_tag: string) -> (error: string) {
-	switch name {
-	case "layout":
-		switch value.(int) {
-		case 0, 1, 2:
-		case:
-			return fmt.tprintf(
-				"Invalid layout: %v, valid layouts are 0 (minimal), 1 (full) and 2 (structured)",
-				value,
-			)
-		}
-	}
-	return
 }
 
 // Echoes the command, then runs it with this process's stdio and returns its exit code.
