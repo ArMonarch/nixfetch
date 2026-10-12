@@ -412,7 +412,7 @@ write_system_information :: proc(
 	}
 }
 
-// writes one field's line: the gap beside the logo or image, the label in bold cyan padded to 14
+// writes one field's line: the gap beside the logo or image, the label in bold cyan padded to 11
 // cells, a gray "→ ", the value and a newline; the label leads with its icon when built with icons,
 // -define:NIXFETCH_ICONS=true
 write_field :: #force_inline proc(
@@ -422,7 +422,7 @@ write_field :: #force_inline proc(
 ) {
 	fmt.sbprintf(
 		builder,
-		"%*s" + BOLD + FG_CYAN + "%s%-14s" + RESET + FG_GRAY + "→ " + RESET + "%s\n",
+		"%*s" + BOLD + FG_CYAN + "%s%-10s" + RESET + FG_GRAY + "→ " + RESET + "%s\n",
 		width,
 		"",
 		icon if SHOW_ICONS else "",
