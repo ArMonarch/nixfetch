@@ -11,7 +11,7 @@
 }:
 stdenv.mkDerivation {
   pname = "nixfetch";
-  version = "0.5.0";
+  version = "1.0.0";
 
   src = lib.fileset.toSource {
     root = ../.;
