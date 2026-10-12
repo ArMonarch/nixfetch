@@ -26,14 +26,14 @@ Optimization :: enum {
 
 Build :: struct {
 	o:      Optimization `usage:"Sets the optimization mode: minimal, size, speed or aggressive, defaulting to debug."`,
-	layout: int `usage:"Sets the layout nixfetch prints: 110, 252, 269 or 227, defaulting to 110."`,
+	layout: int `usage:"Sets the layout nixfetch prints: 0 minimal, 1 full or 2 structured, defaulting to 0."`,
 	static: bool `usage:"Links libc statically, so the binary runs on any Linux of its architecture."`,
 	icons:  bool `usage:"Prints a nerd font icon before each label, off unless given."`,
 }
 
 Run :: struct {
 	o:      Optimization `usage:"Sets the optimization mode: minimal, size, speed or aggressive, defaulting to debug."`,
-	layout: int `usage:"Sets the layout nixfetch prints: 110, 252, 269 or 227, defaulting to 110."`,
+	layout: int `usage:"Sets the layout nixfetch prints: 0 minimal, 1 full or 2 structured, defaulting to 0."`,
 	static: bool `usage:"Links libc statically, so the binary runs on any Linux of its architecture."`,
 	icons:  bool `usage:"Prints a nerd font icon before each label, off unless given."`,
 }
@@ -172,9 +172,12 @@ check_flag :: proc(model: rawptr, name: string, value: any, args_tag: string) ->
 	switch name {
 	case "layout":
 		switch value.(int) {
-		case 110, 252, 269, 227:
+		case 0, 1, 2:
 		case:
-			return fmt.tprintf("Invalid layout: %v, valid layouts are 110, 252, 269 and 227", value)
+			return fmt.tprintf(
+				"Invalid layout: %v, valid layouts are 0 (minimal), 1 (full) and 2 (structured)",
+				value,
+			)
 		}
 	}
 	return

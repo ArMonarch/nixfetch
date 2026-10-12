@@ -8,15 +8,14 @@ import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
 
-// which layout to print, fixed at build time: -define:NIXFETCH_LAYOUT=269
-// the default is 110, also used for any unrecognised number;
-//   110 Icons   - icon, label, ":", value, with a color palette row      (image 1)
-//   252 CLAssic - user@host, a dashed rule, "Label: value" lines         (image 2)
-//   269 BOXed   - fields grouped into titled boxes                       (image 3)
-//   227 BARs    - short upper-case labels, memory drawn as a bar         (image 4)
-LAYOUT :: #config(NIXFETCH_LAYOUT, 110)
+// which layout to print, fixed at build time: -define:NIXFETCH_LAYOUT=2
+// the default is 0, also used for any unrecognised number;
+//   0 minimal    - the fields beside the logo, one "label → value" line each
+//   1 full       - as minimal, with every field nixfetch gathers
+//   2 structured - the fields split into software, hardware and session blocks
+LAYOUT :: #config(NIXFETCH_LAYOUT, 0)
 
-// print "<icon> <label> : <value>" when true, "<label> : <value>" when false: -define:NIXFETCH_ICONS=false
+// print "<icon> <label> → <value>" when true, "<label> → <value>" when false: -define:NIXFETCH_ICONS=false
 SHOW_ICONS :: #config(NIXFETCH_ICONS, true)
 
 // odinfmt: disable
@@ -93,18 +92,16 @@ collect_system_information :: proc(sys: ^SystemInformation) -> Error {
 	uts_name: linux.UTS_Name
 	linux.uname(&uts_name)
 
-	when LAYOUT == 252 {
-		return collect_system_information_layout_252(sys, &uts_name)
-	} else when LAYOUT == 269 {
-		return collect_system_information_layout_269(sys, &uts_name)
-	} else when LAYOUT == 227 {
-		return collect_system_information_layout_227(sys, &uts_name)
+	when LAYOUT == 1 {
+		return collect_system_information_full(sys, &uts_name)
+	} else when LAYOUT == 2 {
+		return collect_system_information_structured(sys, &uts_name)
 	} else {
-		return collect_system_information_layout_110(sys, &uts_name)
+		return collect_system_information_minimal(sys, &uts_name)
 	}
 }
 
-collect_system_information_layout_110 :: proc(
+collect_system_information_minimal :: proc(
 	sys: ^SystemInformation,
 	uts: ^linux.UTS_Name,
 ) -> Error {
@@ -133,21 +130,11 @@ collect_system_information_layout_110 :: proc(
 	return nil
 }
 
-collect_system_information_layout_252 :: proc(
-	sys: ^SystemInformation,
-	uts: ^linux.UTS_Name,
-) -> Error {
+collect_system_information_full :: proc(sys: ^SystemInformation, uts: ^linux.UTS_Name) -> Error {
 	return nil
 }
 
-collect_system_information_layout_269 :: proc(
-	sys: ^SystemInformation,
-	uts: ^linux.UTS_Name,
-) -> Error {
-	return nil
-}
-
-collect_system_information_layout_227 :: proc(
+collect_system_information_structured :: proc(
 	sys: ^SystemInformation,
 	uts: ^linux.UTS_Name,
 ) -> Error {
@@ -159,7 +146,7 @@ get_user_info :: proc(uts: ^linux.UTS_Name, allocator: runtime.Allocator) -> (st
 	if !user_set do user = "user"
 	host := string(cstring(&uts.nodename[0]))
 	return fmt.aprintf(
-			BOLD + FG_BLUE + "%s" + RESET + "@" + FG_GREEN + "%s" + RESET,
+			BOLD + FG_BLUE + "%s" + RESET + FG_GRAY + "@" + RESET + FG_CYAN + "%s" + RESET,
 			user,
 			host,
 			allocator = allocator,
@@ -383,31 +370,35 @@ print_system_information :: proc(sys: ^SystemInformation) -> (string, Error) {
 	// the image goes over the Kitty graphics protocol, which only these terminals speak
 	if sys.terminal_info != "ghostty" && sys.terminal_info != "kitty" do image = ""
 
+	FIELDS_COUNT :: size_of(SystemInformation) / size_of(string)
+	#assert(size_of(SystemInformation) % size_of(string) == 0)
+	LINE_OVERHEAD :: 128
+	capacity := 2 * len(image) + LINE_OVERHEAD * (len(NIX_LOGO_ANSI_COLORED) + FIELDS_COUNT + 4)
+	for line in NIX_LOGO_ANSI_COLORED do capacity += len(line)
+	for field in transmute([FIELDS_COUNT]string)sys^ do capacity += len(field)
+
 	builder: strings.Builder
-	if _, err := strings.builder_init(&builder, context.allocator); err != nil {
+	if _, err := strings.builder_init(&builder, 0, capacity, context.allocator); err != nil {
 		return {}, .Arena_Out_Of_Memory
 	}
 
-	err: Error
-	when LAYOUT == 252 {
-		err = print_system_information_layout_252(&builder, sys, image)
-	} else when LAYOUT == 269 {
-		err = print_system_information_layout_269(&builder, sys, image)
-	} else when LAYOUT == 227 {
-		err = print_system_information_layout_227(&builder, sys, image)
+	when LAYOUT == 1 {
+		print_system_information_full(&builder, sys, image)
+	} else when LAYOUT == 2 {
+		print_system_information_structured(&builder, sys, image)
 	} else {
-		err = print_system_information_layout_110(&builder, sys, image)
+		print_system_information_minimal(&builder, sys, image)
 	}
-	if err != nil do return {}, err
+	assert(cap(builder.buf) == capacity, "a layout wrote past the capacity reserved for it")
 
 	return strings.to_string(builder), nil
 }
 
-print_system_information_layout_110 :: proc(
+print_system_information_minimal :: proc(
 	builder: ^strings.Builder,
 	sys: ^SystemInformation,
 	image: string,
-) -> Error {
+) {
 	strings.write_string(builder, "\n")
 	has_image := image != ""
 	width := IMAGE_WIDTH if has_image else LOGO_WIDTH
@@ -454,11 +445,12 @@ print_system_information_layout_110 :: proc(
 		fmt.sbprintf(builder, "\x1b[%dA", layout_fields_count)
 		write_kitty_image(builder, image)
 	}
-	return nil
+
+	strings.write_rune(builder, '\n')
 }
 
-// writes one field's line: the gap beside the logo or image, the label in blue padded to 10 cells,
-// ": ", the value and a newline; the label leads with its icon when built with icons,
+// writes one field's line: the gap beside the logo or image, the label in bold cyan padded to 10
+// cells, a gray "→ ", the value and a newline; the label leads with its icon when built with icons,
 // -define:NIXFETCH_ICONS=true
 write_field :: #force_inline proc(
 	builder: ^strings.Builder,
@@ -467,7 +459,7 @@ write_field :: #force_inline proc(
 ) {
 	fmt.sbprintf(
 		builder,
-		"%*s" + FG_BLUE + "%s%-10s" + RESET + ": %s\n",
+		"%*s" + BOLD + FG_CYAN + "%s%-10s" + RESET + FG_GRAY + "→ " + RESET + "%s\n",
 		width,
 		"",
 		icon if SHOW_ICONS else "",
@@ -483,31 +475,20 @@ write_kitty_image :: #force_inline proc(builder: ^strings.Builder, path: string)
 	fmt.sbprintf(builder, "  \x1b_Ga=T,f=100,t=f,c=%d;%s\x1b\\", IMAGE_WIDTH - 4, encoded_path)
 }
 
-print_system_information_layout_252 :: proc(
+print_system_information_full :: proc(
 	builder: ^strings.Builder,
 	sys: ^SystemInformation,
 	image: string,
-) -> Error {
-	strings.write_string(builder, "nixfetch 252")
-	return nil
+) {
+	strings.write_string(builder, "nixfetch full")
 }
 
-print_system_information_layout_269 :: proc(
+print_system_information_structured :: proc(
 	builder: ^strings.Builder,
 	sys: ^SystemInformation,
 	image: string,
-) -> Error {
-	strings.write_string(builder, "nixfetch 269")
-	return nil
-}
-
-print_system_information_layout_227 :: proc(
-	builder: ^strings.Builder,
-	sys: ^SystemInformation,
-	image: string,
-) -> Error {
-	strings.write_string(builder, "nixfetch 227")
-	return nil
+) {
+	strings.write_string(builder, "nixfetch structured")
 }
 
 // cells the NixOS logo takes up, so system info lines up on the right
